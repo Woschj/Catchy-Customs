@@ -1,0 +1,91 @@
+/* styles.css */
+body {
+    background-color: #333333;
+    color: white;
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 100vh;
+}
+
+#app {
+    width: 800px;
+    padding: 20px;
+    background-color: #444444;
+    border-radius: 8px;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+    overflow: auto;
+}
+
+.options-frame {
+    padding: 10px;
+    position: fixed;
+    top: 0;
+    width: 760px;
+    background-color: #444444;
+    z-index: 1;
+}
+
+.manufacturer-model-frame,
+.design-material-frame,
+.buttons-frame {
+    margin-bottom: 20px;
+}
+
+label {
+    margin-right: 10px;
+    font-weight: bold;
+}
+
+select {
+    margin-right: 10px;
+    background-color: #555555;
+    color: white;
+    border: none;
+    padding: 5px;
+    border-radius: 5px;
+}
+
+button {
+    background-color: #555555;
+    color: white;
+    margin-right: 10px;
+    padding: 10px 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+button i {
+    margin-right: 5px;
+}
+
+button:hover {
+    background-color: #666666;
+}
+
+.preview-frame {
+    text-align: center;
+    margin: 80px 0 20px 0; /* Ensure there's space at the top for fixed options */
+}
+
+#preview-canvas {
+    background-color: #222222;
+    border: 2px solid #555555;
+    border-radius: 8px;
+}
+
+.tools-frame {
+    text-align: center;
+    margin-top: 20px;
+}
+
+.tools-frame button {
+    width: 120px;
+}
