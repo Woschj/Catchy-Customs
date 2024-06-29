@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', async () => {
     const REPO_OWNER = 'Woschj';
-    const REPO_NAME = 'CatchyCases';
+    const REPO_NAME = 'Catchy-Customs';
     const DESIGN_FOLDER = 'design';
     const MATERIAL_FOLDER = 'materials';
 
