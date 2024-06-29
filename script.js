@@ -4,12 +4,6 @@ document.addEventListener('DOMContentLoaded', async () => {
     const DESIGN_FOLDER = 'design';
     const MATERIAL_FOLDER = 'materials';
 
-    const manufacturers = {
-        "Apple": ["iPhone SE", "iPhone 12", "iPhone 12 Pro", "iPhone 13", "iPhone 13 Pro"],
-        "Samsung": ["Galaxy S21", "Galaxy S21+", "Galaxy Note 20", "Galaxy A52", "Galaxy A52"],
-        "Google": ["Pixel 4", "Pixel 4a", "Pixel 5", "Pixel 5a", "Pixel 6"],
-    };
-
     const manufacturerSelect = document.getElementById('manufacturer-select');
     const modelSelect = document.getElementById('model-select');
     const designSelect = document.getElementById('design-select');
@@ -17,31 +11,46 @@ document.addEventListener('DOMContentLoaded', async () => {
     const previewCanvas = document.getElementById('preview-canvas');
     const ctx = previewCanvas.getContext('2d');
 
-    // Set high-resolution canvas size (15% smaller than previously)
-    const CANVAS_WIDTH = 544;  // Example width (15% smaller than 640)
-    const CANVAS_HEIGHT = 544; // Example height (15% smaller than 640)
+    const CANVAS_WIDTH = 544;
+    const CANVAS_HEIGHT = 544;
     previewCanvas.width = CANVAS_WIDTH;
     previewCanvas.height = CANVAS_HEIGHT;
 
-    function populateDropdown(dropdown, items, selectFirst = false) {
-        dropdown.innerHTML = ''; // Clear the dropdown to avoid duplicates
+    function populateDropdown(dropdown, items, selectFirst = true) {
+        dropdown.innerHTML = '';
         items.forEach((item, index) => {
             const option = document.createElement('option');
             option.value = item.url;
             option.textContent = item.name;
-            if (selectFirst && index === 0) {
-                option.selected = true;
-            }
             dropdown.appendChild(option);
         });
+
+        if (selectFirst && items.length > 0) {
+            dropdown.selectedIndex = 0;
+        }
     }
 
-    async function fetchFiles(folder) {
+    async function fetchFolders(folder) {
         const response = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${folder}`);
+        const folders = await response.json();
+        return folders.filter(folder => folder.type === 'dir').map(folder => folder.name);
+    }
+
+    async function fetchImages(folder) {
+        const response = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${DESIGN_FOLDER}/${folder}`);
         const files = await response.json();
-        return files.filter(file => /\.(jpg|jpeg|png|gif)$/i.test(file.path)).map(file => ({
+        return files.filter(file => /\.(jpg|jpeg|png|gif)$/i.test(file.name)).map(file => ({
             name: file.name,
-            url: `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/${file.path}`
+            url: `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/${DESIGN_FOLDER}/${folder}/${file.name}`
+        }));
+    }
+
+    async function fetchMaterials() {
+        const response = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${MATERIAL_FOLDER}`);
+        const files = await response.json();
+        return files.filter(file => /\.(jpg|jpeg|png|gif)$/i.test(file.name)).map(file => ({
+            name: file.name,
+            url: `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/${MATERIAL_FOLDER}/${file.name}`
         }));
     }
 
@@ -50,9 +59,75 @@ document.addEventListener('DOMContentLoaded', async () => {
             const img = new Image();
             img.onload = () => resolve(img);
             img.onerror = reject;
-            img.crossOrigin = "Anonymous"; // Handle CORS issues
+            img.crossOrigin = "Anonymous";
             img.src = src;
         });
+    }
+
+    async function detectAndMaskLenses(imageData) {
+        const threshold = 100; // Adjust this value based on your specific use case
+        const minBlobSize = 100; // Minimum size of a blob to be considered a lens
+
+        const data = imageData.data;
+        const width = imageData.width;
+        const height = imageData.height;
+
+        const mask = new Uint8ClampedArray(data.length);
+
+        // Simple color thresholding to detect potential lens areas
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i];
+            const g = data[i + 1];
+            const b = data[i + 2];
+
+            // Detect dark areas (simplified assumption for lenses)
+            if (r < threshold && g < threshold && b < threshold) {
+                mask[i / 4] = 1;
+            }
+        }
+
+        // Blob detection to identify contiguous regions
+        const blobs = [];
+        const visited = new Uint8ClampedArray(mask.length);
+
+        function visit(x, y, blob) {
+            const index = y * width + x;
+            if (x < 0 || x >= width || y < 0 || y >= height || visited[index] || !mask[index]) {
+                return;
+            }
+
+            visited[index] = 1;
+            blob.push(index);
+
+            visit(x - 1, y, blob);
+            visit(x + 1, y, blob);
+            visit(x, y - 1, blob);
+            visit(x, y + 1, blob);
+        }
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const index = y * width + x;
+                if (!visited[index] && mask[index]) {
+                    const blob = [];
+                    visit(x, y, blob);
+                    if (blob.length >= minBlobSize) {
+                        blobs.push(blob);
+                    }
+                }
+            }
+        }
+
+        // Mask out detected blobs
+        for (const blob of blobs) {
+            for (const index of blob) {
+                const i = index * 4;
+                data[i] = 255;
+                data[i + 1] = 255;
+                data[i + 2] = 255;
+                data[i + 3] = 255;
+            }
+        }
     }
 
     async function updatePreview() {
@@ -63,7 +138,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             const designImg = await loadImage(selectedDesign);
             ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
 
-            // Maintain aspect ratio and avoid pixelation
             const canvasRatio = previewCanvas.width / previewCanvas.height;
             const imageRatio = designImg.width / designImg.height;
             let drawWidth, drawHeight, offsetX, offsetY;
@@ -80,12 +154,16 @@ document.addEventListener('DOMContentLoaded', async () => {
                 offsetY = (previewCanvas.height - drawHeight) / 2;
             }
 
-            // Create a temporary high-resolution canvas
             const tempCanvas = document.createElement('canvas');
             const tempCtx = tempCanvas.getContext('2d');
             tempCanvas.width = drawWidth;
             tempCanvas.height = drawHeight;
             tempCtx.drawImage(designImg, 0, 0, drawWidth, drawHeight);
+
+            // Detect and mask out camera lenses
+            const designData = tempCtx.getImageData(0, 0, drawWidth, drawHeight);
+            await detectAndMaskLenses(designData);
+            tempCtx.putImageData(designData, 0, 0);
 
             if (selectedMaterial && selectedMaterial !== 'No Material') {
                 const materialImg = await loadImage(selectedMaterial);
@@ -110,31 +188,50 @@ document.addEventListener('DOMContentLoaded', async () => {
                 tempCtx.putImageData(designData, 0, 0);
             }
 
-            // Draw the final combined image onto the preview canvas
             ctx.drawImage(tempCanvas, offsetX, offsetY, drawWidth, drawHeight);
         }
     }
 
-    manufacturerSelect.addEventListener('change', () => {
+    async function handleManufacturerChange() {
         const selectedManufacturer = manufacturerSelect.value;
-        modelSelect.innerHTML = '<option value="">Select Model</option>';
-        if (selectedManufacturer && manufacturers[selectedManufacturer]) {
-            populateDropdown(modelSelect, manufacturers[selectedManufacturer].map(model => ({ name: model, url: model })));
+        if (selectedManufacturer && selectedManufacturer !== 'Select Manufacturer') {
+            const images = await fetchImages(selectedManufacturer);
+            const models = [...new Set(images.map(image => image.name.split('_')[0]))];
+            populateDropdown(modelSelect, models.map(model => ({ name: model, url: model })));
+
+            if (models.length > 0) {
+                modelSelect.value = models[0].url;
+                await handleModelChange(); // Fetch and populate designs
+            }
         }
-    });
+    }
 
-    modelSelect.addEventListener('change', () => {
-        if (designSelect.options.length > 0) {
-            designSelect.selectedIndex = 0; // Select the first design by default
+    async function handleModelChange() {
+        const selectedManufacturer = manufacturerSelect.value;
+        const selectedModel = modelSelect.value;
+        if (selectedManufacturer && selectedModel) {
+            const images = await fetchImages(selectedManufacturer);
+            const designs = images.filter(image => image.name.startsWith(selectedModel)).map(image => ({
+                name: image.name.split('_')[1],
+                url: image.url
+            }));
+            populateDropdown(designSelect, designs);
+
+            if (designs.length > 0) {
+                designSelect.value = designs[0].url;
+                updatePreview();
+            }
         }
-        materialSelect.selectedIndex = 0; // Select "No Material" by default
-        updatePreview(); // Update preview once the model is selected
-    });
+    }
 
-    const designs = await fetchFiles(DESIGN_FOLDER);
-    const materials = await fetchFiles(MATERIAL_FOLDER);
+    manufacturerSelect.addEventListener('change', handleManufacturerChange);
+    modelSelect.addEventListener('change', handleModelChange);
 
-    populateDropdown(designSelect, designs, true); // Select the first design by default
+    const manufacturers = await fetchFolders(DESIGN_FOLDER);
+    populateDropdown(manufacturerSelect, manufacturers.map(manufacturer => ({ name: manufacturer, url: manufacturer })), false);
+    manufacturerSelect.value = 'Select Manufacturer';
+
+    const materials = await fetchMaterials();
     populateDropdown(materialSelect, materials);
     materialSelect.insertAdjacentHTML('afterbegin', '<option value="No Material" selected>No Material</option>');
 
