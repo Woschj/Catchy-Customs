@@ -58,6 +58,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${MATERIAL_FOLDER}`
     );
     const files = await response.json();
+    console.log("Fetched materials:", files); // Add this line
     return files
       .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
       .map((file) => ({
@@ -107,6 +108,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       tempCtx.drawImage(designImg, 0, 0, drawWidth, drawHeight);
 
       if (selectedMaterial && selectedMaterial !== "No Material") {
+        console.log("Selected material:", selectedMaterial); // Add this line
         const materialImg = await loadImage(selectedMaterial);
         const materialCanvas = document.createElement("canvas");
         const materialCtx = materialCanvas.getContext("2d");
