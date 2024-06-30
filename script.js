@@ -81,81 +81,70 @@ document.addEventListener("DOMContentLoaded", async () => {
     const selectedMaterial = materialSelect.value;
 
     if (selectedDesign) {
-      const designImg = await loadImage(selectedDesign);
-      ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+      try {
+        const designImg = await loadImage(selectedDesign);
+        ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
 
-      const canvasRatio = previewCanvas.width / previewCanvas.height;
-      const imageRatio = designImg.width / designImg.height;
-      let drawWidth, drawHeight, offsetX, offsetY;
+        const canvasRatio = previewCanvas.width / previewCanvas.height;
+        const imageRatio = designImg.width / designImg.height;
+        let drawWidth, drawHeight, offsetX, offsetY;
 
-      if (canvasRatio > imageRatio) {
-        drawHeight = previewCanvas.height;
-        drawWidth = drawHeight * imageRatio;
-        offsetX = (previewCanvas.width - drawWidth) / 2;
-        offsetY = 0;
-      } else {
-        drawWidth = previewCanvas.width;
-        drawHeight = drawWidth / imageRatio;
-        offsetX = 0;
-        offsetY = (previewCanvas.height - drawHeight) / 2;
-      }
-
-      const tempCanvas = document.createElement("canvas");
-      const tempCtx = tempCanvas.getContext("2d");
-      tempCanvas.width = drawWidth;
-      tempCanvas.height = drawHeight;
-      tempCtx.drawImage(designImg, 0, 0, drawWidth, drawHeight);
-
-      if (selectedMaterial && selectedMaterial !== "No Material") {
-        const materialImg = await loadImage(selectedMaterial);
-        const materialCanvas = document.createElement("canvas");
-        const materialCtx = materialCanvas.getContext("2d");
-        materialCanvas.width = drawWidth;
-        materialCanvas.height = drawHeight;
-        materialCtx.drawImage(materialImg, 0, 0, drawWidth, drawHeight);
-
-        const materialData = materialCtx.getImageData(
-          0,
-          0,
-          drawWidth,
-          drawHeight
-        );
-        const designData = tempCtx.getImageData(0, 0, drawWidth, drawHeight);
-
-        for (let i = 0; i < designData.data.length; i += 4) {
-          const alpha = designData.data[i + 3] / 255;
-          const invAlpha = 1 - alpha;
-
-          // Blend the material with the design based on the design's alpha channel
-          designData.data[i] =
-            designData.data[i] * alpha + materialData.data[i] * invAlpha;
-          designData.data[i + 1] =
-            designData.data[i + 1] * alpha +
-            materialData.data[i + 1] * invAlpha;
-          designData.data[i + 2] =
-            designData.data[i + 2] * alpha +
-            materialData.data[i + 2] * invAlpha;
-          // Keep the original alpha value of the design
-          designData.data[i + 3] = 255;
+        if (canvasRatio > imageRatio) {
+          drawHeight = previewCanvas.height;
+          drawWidth = drawHeight * imageRatio;
+          offsetX = (previewCanvas.width - drawWidth) / 2;
+          offsetY = 0;
+        } else {
+          drawWidth = previewCanvas.width;
+          drawHeight = drawWidth / imageRatio;
+          offsetX = 0;
+          offsetY = (previewCanvas.height - drawHeight) / 2;
         }
 
-        tempCtx.putImageData(designData, 0, 0);
-      }
+        ctx.drawImage(designImg, offsetX, offsetY, drawWidth, drawHeight);
 
-      ctx.drawImage(tempCanvas, offsetX, offsetY, drawWidth, drawHeight);
+        if (selectedMaterial && selectedMaterial !== "No Material") {
+          try {
+            const materialImg = await loadImage(selectedMaterial);
+            const designData = ctx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
+            const materialCanvas = document.createElement("canvas");
+            const materialCtx = materialCanvas.getContext("2d");
+            materialCanvas.width = previewCanvas.width;
+            materialCanvas.height = previewCanvas.height;
+            materialCtx.drawImage(materialImg, offsetX, offsetY, drawWidth, drawHeight);
+            const materialData = materialCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
+
+            for (let i = 0; i < designData.data.length; i += 4) {
+              const r = designData.data[i];
+              const g = designData.data[i + 1];
+              const b = designData.data[i + 2];
+              const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
+
+              if (brightness < 128) { // Dark pixel
+                const alpha = brightness / 255;
+
+                designData.data[i] = designData.data[i] * alpha + materialData.data[i] * (1 - alpha);
+                designData.data[i + 1] = designData.data[i + 1] * alpha + materialData.data[i + 1] * (1 - alpha);
+                designData.data[i + 2] = designData.data[i + 2] * alpha + materialData.data[i + 2] * (1 - alpha);
+              }
+            }
+
+            ctx.putImageData(designData, 0, 0);
+          } catch (err) {
+            console.error("Error loading material image:", err);
+          }
+        }
+      } catch (err) {
+        console.error("Error loading design image:", err);
+      }
     }
   }
 
   async function handleManufacturerChange() {
     const selectedManufacturer = manufacturerSelect.value;
-    if (
-      selectedManufacturer &&
-      selectedManufacturer !== "Select Manufacturer"
-    ) {
+    if (selectedManufacturer && selectedManufacturer !== "Select Manufacturer") {
       const images = await fetchImages(selectedManufacturer);
-      const models = [
-        ...new Set(images.map((image) => image.name.split("_")[0]))
-      ];
+      const models = [...new Set(images.map((image) => image.name.split("_")[0]))];
       populateDropdown(
         modelSelect,
         models.map((model) => ({ name: model, url: model }))
