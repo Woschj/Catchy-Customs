@@ -144,18 +144,13 @@ async function updatePreview() {
         const alpha = designData.data[i + 3] / 255;
         const invAlpha = 1 - alpha;
 
-        // Check if the design pixel is dark
-        const isDark = designData.data[i] + designData.data[i + 1] + designData.data[i + 2] < 128 * 3;
-
-        if (isDark) {
-          // Blend the material with the design based on the design's alpha channel
-          designData.data[i] =
-            designData.data[i] * alpha + materialData.data[i] * invAlpha;
-          designData.data[i + 1] =
-            designData.data[i + 1] * alpha + materialData.data[i + 1] * invAlpha;
-          designData.data[i + 2] =
-            designData.data[i + 2] * alpha + materialData.data[i + 2] * invAlpha;
-        }
+        // Blend the material with the design based on the design's alpha channel
+        designData.data[i] =
+          designData.data[i] * alpha + materialData.data[i] * invAlpha;
+        designData.data[i + 1] =
+          designData.data[i + 1] * alpha + materialData.data[i + 1] * invAlpha;
+        designData.data[i + 2] =
+          designData.data[i + 2] * alpha + materialData.data[i + 2] * invAlpha;
         // Keep the original alpha value of the design
         designData.data[i + 3] = 255;
       }
@@ -166,7 +161,6 @@ async function updatePreview() {
     ctx.drawImage(tempCanvas, offsetX, offsetY, drawWidth, drawHeight);
   }
 }
-
   async function handleManufacturerChange() {
     const selectedManufacturer = manufacturerSelect.value;
     if (
