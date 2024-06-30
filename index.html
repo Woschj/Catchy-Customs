@@ -3,57 +3,129 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Image Customizer</title>
+  <title>Catchy Cases</title>
   <style>
-    #preview-canvas {
-      border: 1px solid black;
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #e0e0e0;
+      background-color: #121212;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
     }
+
+    h1 {
+      font-weight: 600;
+      margin-bottom: 20px;
+      color: #ffffff;
+      text-align: center;
+      font-size: 2rem;
+    }
+
+    #container {
+      display: flex;
+      flex-direction: row;
+      align-items: flex-start;
+    }
+
     #controls {
       display: flex;
       flex-direction: column;
-      margin-top: 20px;
+      align-items: flex-start;
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      margin-right: 20px;
     }
-    #controls label, #controls select, #controls input, #controls button {
-      margin-bottom: 10px;
+
+    #controls label {
+      font-size: 14px;
+      margin-bottom: 8px;
+      color: #b3b3b3;
+    }
+
+    #controls select, #controls input, #controls button {
+      width: 200px;
+      padding: 10px;
+      margin-bottom: 20px;
+      border: 1px solid #333;
+      border-radius: 5px;
+      font-size: 16px;
+      font-family: inherit;
+      background: #2c2c2c;
+      color: #e0e0e0;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    #controls select:focus, #controls input:focus, #controls button:focus {
+      border-color: #0071e3;
+    }
+
+    #dev-tools {
+      background: #0071e3;
+      color: white;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+
+    #dev-tools:hover {
+      background: #005bb5;
+    }
+
+    #preview-canvas {
+      border: 1px solid #333;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      background: #1e1e1e;
     }
   </style>
 </head>
 <body>
-  <h1>Image Customizer</h1>
-  <div id="controls">
-    <label for="manufacturer-select">Manufacturer:</label>
-    <select id="manufacturer-select"></select>
-    
-    <label for="model-select">Model:</label>
-    <select id="model-select"></select>
-    
-    <label for="design-select">Design:</label>
-    <select id="design-select"></select>
-    
-    <label for="material-select">Material:</label>
-    <select id="material-select"></select>
-    
-    <label for="custom-upload">Upload Custom Image:</label>
-    <input type="file" id="custom-upload" accept="image/*">
-    
-    <button id="apply-custom">Apply Custom Image</button>
+  <h1>Catchy Cases</h1>
+  <div id="container">
+    <div id="controls">
+      <label for="manufacturer-select">Hersteller:</label>
+      <select id="manufacturer-select"></select>
+      
+      <label for="model-select">Modell:</label>
+      <select id="model-select"></select>
+      
+      <label for="design-select">Design:</label>
+      <select id="design-select"></select>
+      
+      <label for="material-select">Material:</label>
+      <select id="material-select"></select>
+      
+      <!-- Custom image functionality disabled for now -->
+      <!--
+      <label for="custom-upload">Eigenes Bild hochladen:</label>
+      <input type="file" id="custom-upload" accept="image/*">
+      
+      <button id="apply-custom">Eigenes Bild anwenden</button>
+      -->
+      <button id="dev-tools">Dev-Tools aktivieren</button>
+    </div>
+    <canvas id="preview-canvas"></canvas>
   </div>
-  <canvas id="preview-canvas"></canvas>
   
   <script>
     document.addEventListener("DOMContentLoaded", async () => {
       const REPO_OWNER = "Woschj";
       const REPO_NAME = "Catchy-Customs";
       const DESIGN_FOLDER = "design";
-      const MATERIAL_FOLDER = "material"; // Corrected folder path
+      const MATERIAL_FOLDER = "material";
 
       const manufacturerSelect = document.getElementById("manufacturer-select");
       const modelSelect = document.getElementById("model-select");
       const designSelect = document.getElementById("design-select");
       const materialSelect = document.getElementById("material-select");
-      const customUpload = document.getElementById("custom-upload");
-      const applyCustomButton = document.getElementById("apply-custom");
       const previewCanvas = document.getElementById("preview-canvas");
+      const devToolsButton = document.getElementById("dev-tools");
       const ctx = previewCanvas.getContext("2d");
 
       const CANVAS_WIDTH = 544;
@@ -61,8 +133,8 @@
       previewCanvas.width = CANVAS_WIDTH;
       previewCanvas.height = CANVAS_HEIGHT;
 
-      let customImage = null;
-      let customImageApplied = false;
+      let maskRect = null;
+      let drawing = false;
 
       function populateDropdown(dropdown, items, selectFirst = true) {
         dropdown.innerHTML = "";
@@ -162,7 +234,7 @@
                 materialCtx.drawImage(materialImg, offsetX, offsetY, drawWidth, drawHeight);
                 const materialData = materialCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
 
-                const threshold = 100; // Adjust the threshold for dark areas
+                const threshold = 60; // Schwellenwert für dunkle Bereiche
 
                 for (let i = 0; i < designData.data.length; i += 4) {
                   const r = designData.data[i];
@@ -170,7 +242,7 @@
                   const b = designData.data[i + 2];
                   const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
 
-                  if (brightness < threshold) { // Apply material only on darkest pixels
+                  if (brightness < threshold) { // Material nur auf den dunkelsten Pixeln anwenden
                     designData.data[i] = materialData.data[i];
                     designData.data[i + 1] = materialData.data[i + 1];
                     designData.data[i + 2] = materialData.data[i + 2];
@@ -179,15 +251,31 @@
 
                 ctx.putImageData(designData, 0, 0);
               } catch (err) {
-                console.error("Error loading material image:", err);
+                console.error("Fehler beim Laden des Materialbilds:", err);
               }
             }
 
-            if (customImage && !customImageApplied) {
-              ctx.drawImage(customImage.img, customImage.x, customImage.y, customImage.width, customImage.height);
+            // Zeichnet die Maske, falls vorhanden
+            if (maskRect) {
+              ctx.save();
+              ctx.strokeStyle = "red";
+              ctx.lineWidth = 2;
+              ctx.beginPath();
+              ctx.moveTo(maskRect.x + maskRect.radius, maskRect.y);
+              ctx.lineTo(maskRect.x + maskRect.width - maskRect.radius, maskRect.y);
+              ctx.quadraticCurveTo(maskRect.x + maskRect.width, maskRect.y, maskRect.x + maskRect.width, maskRect.y + maskRect.radius);
+              ctx.lineTo(maskRect.x + maskRect.width, maskRect.y + maskRect.height - maskRect.radius);
+              ctx.quadraticCurveTo(maskRect.x + maskRect.width, maskRect.y + maskRect.height, maskRect.x + maskRect.width - maskRect.radius, maskRect.y + maskRect.height);
+              ctx.lineTo(maskRect.x + maskRect.radius, maskRect.y + maskRect.height);
+              ctx.quadraticCurveTo(maskRect.x, maskRect.y + maskRect.height, maskRect.x, maskRect.y + maskRect.height - maskRect.radius);
+              ctx.lineTo(maskRect.x, maskRect.y + maskRect.radius);
+              ctx.quadraticCurveTo(maskRect.x, maskRect.y, maskRect.x + maskRect.radius, maskRect.y);
+              ctx.stroke();
+              ctx.restore();
             }
+
           } catch (err) {
-            console.error("Error loading design image:", err);
+            console.error("Fehler beim Laden des Designbilds:", err);
           }
         }
       }
@@ -204,7 +292,7 @@
 
           if (models.length > 0) {
             modelSelect.value = models[0].url;
-            await handleModelChange(); // Fetch and populate designs
+            await handleModelChange(); // Modelle abrufen und Dropdown füllen
           }
         }
       }
@@ -232,107 +320,6 @@
       manufacturerSelect.addEventListener("change", handleManufacturerChange);
       modelSelect.addEventListener("change", handleModelChange);
 
-      customUpload.addEventListener("change", async (event) => {
-        const file = event.target.files[0];
-        if (file) {
-          const url = URL.createObjectURL(file);
-          const img = await loadImage(url);
-          const scale = Math.min(previewCanvas.width / img.width, previewCanvas.height / img.height);
-          customImage = {
-            img,
-            x: (previewCanvas.width - img.width * scale) / 2,
-            y: (previewCanvas.height - img.height * scale) / 2,
-            width: img.width * scale,
-            height: img.height * scale
-          };
-          customImageApplied = false;
-          updatePreview();
-        }
-      });
-
-      previewCanvas.addEventListener("mousedown", (event) => {
-        const rect = previewCanvas.getBoundingClientRect();
-        const offsetX = event.clientX - rect.left;
-        const offsetY = event.clientY - rect.top;
-
-        if (customImage) {
-          customImage.offsetX = offsetX - customImage.x;
-          customImage.offsetY = offsetY - customImage.y;
-          customImage.dragging = true;
-        }
-      });
-
-      previewCanvas.addEventListener("mousemove", (event) => {
-        if (customImage && customImage.dragging) {
-          const rect = previewCanvas.getBoundingClientRect();
-          const offsetX = event.clientX - rect.left;
-          const offsetY = event.clientY - rect.top;
-
-          customImage.x = offsetX - customImage.offsetX;
-          customImage.y = offsetY - customImage.offsetY;
-
-          updatePreview();
-        }
-      });
-
-      previewCanvas.addEventListener("mouseup", () => {
-        if (customImage) {
-          customImage.dragging = false;
-        }
-      });
-
-      previewCanvas.addEventListener("wheel", (event) => {
-        if (customImage) {
-          const delta = event.deltaY < 0 ? 1.1 : 0.9;
-          customImage.width *= delta;
-          customImage.height *= delta;
-
-          updatePreview();
-        }
-      });
-
-      applyCustomButton.addEventListener("click", () => {
-        if (customImage) {
-          const selectedDesign = designSelect.value;
-          if (selectedDesign) {
-            loadImage(selectedDesign).then((designImg) => {
-              const designCanvas = document.createElement("canvas");
-              const designCtx = designCanvas.getContext("2d");
-              designCanvas.width = previewCanvas.width;
-              designCanvas.height = previewCanvas.height;
-              designCtx.drawImage(designImg, 0, 0, previewCanvas.width, previewCanvas.height);
-
-              const designData = designCtx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
-              const customData = ctx.getImageData(customImage.x, customImage.y, customImage.width, customImage.height);
-              const blendedData = new ImageData(customImage.width, customImage.height);
-
-              const threshold = 100; // Adjust the threshold for dark areas
-
-              for (let i = 0; i < customData.data.length; i += 4) {
-                const r = designData.data[i];
-                const g = designData.data[i + 1];
-                const b = designData.data[i + 2];
-                const brightness = 0.299 * r + 0.587 * g + 0.114 * b;
-
-                if (brightness < threshold) { // Apply custom image only on dark pixels
-                  blendedData.data[i] = customData.data[i];
-                  blendedData.data[i + 1] = customData.data[i + 1];
-                  blendedData.data[i + 2] = customData.data[i + 2];
-                  blendedData.data[i + 3] = customData.data[i + 3]; // Retain alpha value
-                } else {
-                  blendedData.data[i + 3] = 0; // Make non-dark areas fully transparent
-                }
-              }
-
-              ctx.putImageData(blendedData, customImage.x, customImage.y);
-              customImageApplied = true;
-            }).catch((err) => {
-              console.error("Error loading design image for masking:", err);
-            });
-          }
-        }
-      });
-
       const manufacturers = await fetchFolders(DESIGN_FOLDER);
       populateDropdown(
         manufacturerSelect,
@@ -354,8 +341,51 @@
       designSelect.addEventListener("change", updatePreview);
       materialSelect.addEventListener("change", updatePreview);
 
-      // Initial preview update if necessary
+      // Initiale Vorschau-Aktualisierung
       if (designSelect.options.length > 0 && modelSelect.options.length > 0) {
+        updatePreview();
+      }
+
+      // Event-Handler für Dev-Tools
+      devToolsButton.addEventListener("click", () => {
+        drawing = !drawing;
+        devToolsButton.textContent = drawing ? "Dev-Tools deaktivieren" : "Dev-Tools aktivieren";
+      });
+
+      // Event-Handler für Zeichnen der Maske
+      previewCanvas.addEventListener("mousedown", (event) => {
+        if (drawing) {
+          const rect = previewCanvas.getBoundingClientRect();
+          const startX = event.clientX - rect.left;
+          const startY = event.clientY - rect.top;
+
+          previewCanvas.addEventListener("mousemove", onMouseMove);
+          previewCanvas.addEventListener("mouseup", onMouseUp);
+
+          function onMouseMove(moveEvent) {
+            const currentX = moveEvent.clientX - rect.left;
+            const currentY = moveEvent.clientY - rect.top;
+            const width = currentX - startX;
+            const height = currentY - startY;
+            const radius = 20; // Abgerundete Ecken
+
+            maskRect = { x: startX, y: startY, width, height, radius };
+            updatePreview();
+          }
+
+          function onMouseUp() {
+            previewCanvas.removeEventListener("mousemove", onMouseMove);
+            previewCanvas.removeEventListener("mouseup", onMouseUp);
+            // Speichert die Maske für zukünftige Verwendung
+            localStorage.setItem('maskRect', JSON.stringify(maskRect));
+          }
+        }
+      });
+
+      // Lädt gespeicherte Maske
+      const savedMask = localStorage.getItem('maskRect');
+      if (savedMask) {
+        maskRect = JSON.parse(savedMask);
         updatePreview();
       }
     });
