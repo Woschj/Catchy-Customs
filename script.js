@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const REPO_OWNER = "Woschj";
   const REPO_NAME = "Catchy-Customs";
   const DESIGN_FOLDER = "design";
-  const MATERIAL_FOLDER = "material";
+  const MATERIAL_FOLDER = "material"; // Corrected folder path
 
   const manufacturerSelect = document.getElementById("manufacturer-select");
   const modelSelect = document.getElementById("model-select");
@@ -58,7 +58,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${MATERIAL_FOLDER}`
     );
     const files = await response.json();
-    console.log("Fetched materials:", files);
     return files
       .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
       .map((file) => ({
@@ -108,7 +107,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       tempCtx.drawImage(designImg, 0, 0, drawWidth, drawHeight);
 
       if (selectedMaterial && selectedMaterial !== "No Material") {
-        console.log("Selected material:", selectedMaterial);
         const materialImg = await loadImage(selectedMaterial);
         const materialCanvas = document.createElement("canvas");
         const materialCtx = materialCanvas.getContext("2d");
@@ -116,7 +114,12 @@ document.addEventListener("DOMContentLoaded", async () => {
         materialCanvas.height = drawHeight;
         materialCtx.drawImage(materialImg, 0, 0, drawWidth, drawHeight);
 
-        const materialData = materialCtx.getImageData(0, 0, drawWidth, drawHeight);
+        const materialData = materialCtx.getImageData(
+          0,
+          0,
+          drawWidth,
+          drawHeight
+        );
         const designData = tempCtx.getImageData(0, 0, drawWidth, drawHeight);
 
         for (let i = 0; i < designData.data.length; i += 4) {
@@ -127,9 +130,11 @@ document.addEventListener("DOMContentLoaded", async () => {
           designData.data[i] =
             designData.data[i] * alpha + materialData.data[i] * invAlpha;
           designData.data[i + 1] =
-            designData.data[i + 1] * alpha + materialData.data[i + 1] * invAlpha;
+            designData.data[i + 1] * alpha +
+            materialData.data[i + 1] * invAlpha;
           designData.data[i + 2] =
-            designData.data[i + 2] * alpha + materialData.data[i + 2] * invAlpha;
+            designData.data[i + 2] * alpha +
+            materialData.data[i + 2] * invAlpha;
           // Keep the original alpha value of the design
           designData.data[i + 3] = 255;
         }
