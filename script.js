@@ -2,7 +2,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const REPO_OWNER = "Woschj";
   const REPO_NAME = "Catchy-Customs";
   const DESIGN_FOLDER = "design";
-  const MATERIAL_FOLDER = "material"; // Corrected folder path
+  const MATERIAL_FOLDER = "material";
 
   const manufacturerSelect = document.getElementById("manufacturer-select");
   const modelSelect = document.getElementById("model-select");
@@ -10,16 +10,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const materialSelect = document.getElementById("material-select");
   const previewCanvas = document.getElementById("preview-canvas");
   const ctx = previewCanvas.getContext("2d");
-  const materials = await fetchMaterials();
-    if (materials.length > 0) {
-      populateDropdown(materialSelect, materials);
-    } else {
-    console.log("No materials found.");
-}
-materialSelect.insertAdjacentHTML(
-  "afterbegin",
-  '<option value="No Material" selected>No Material</option>'
-);
 
   const CANVAS_WIDTH = 544;
   const CANVAS_HEIGHT = 544;
@@ -63,31 +53,19 @@ materialSelect.insertAdjacentHTML(
       }));
   }
 
-async function fetchMaterials() {
-  try {
+  async function fetchMaterials() {
     const response = await fetch(
       `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${MATERIAL_FOLDER}`
     );
-    if (!response.ok) {
-      if (response.status === 404) {
-        console.error("Materials folder not found. Please check the folder name and path.");
-      } else {
-        console.error("Failed to fetch materials:", response.status, response.statusText);
-      }
-      return [];
-    }
     const files = await response.json();
+    console.log("Fetched materials:", files);
     return files
       .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
       .map((file) => ({
         name: file.name,
         url: `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/${MATERIAL_FOLDER}/${file.name}`
       }));
-  } catch (error) {
-    console.error("Error fetching materials:", error);
-    return [];
   }
-}
 
   function loadImage(src) {
     return new Promise((resolve, reject) => {
@@ -99,68 +77,70 @@ async function fetchMaterials() {
     });
   }
 
-async function updatePreview() {
-  const selectedDesign = designSelect.value;
-  const selectedMaterial = materialSelect.value;
+  async function updatePreview() {
+    const selectedDesign = designSelect.value;
+    const selectedMaterial = materialSelect.value;
 
-  if (selectedDesign) {
-    const designImg = await loadImage(selectedDesign);
-    ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+    if (selectedDesign) {
+      const designImg = await loadImage(selectedDesign);
+      ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
 
-    const canvasRatio = previewCanvas.width / previewCanvas.height;
-    const imageRatio = designImg.width / designImg.height;
-    let drawWidth, drawHeight, offsetX, offsetY;
+      const canvasRatio = previewCanvas.width / previewCanvas.height;
+      const imageRatio = designImg.width / designImg.height;
+      let drawWidth, drawHeight, offsetX, offsetY;
 
-    if (canvasRatio > imageRatio) {
-      drawHeight = previewCanvas.height;
-      drawWidth = drawHeight * imageRatio;
-      offsetX = (previewCanvas.width - drawWidth) / 2;
-      offsetY = 0;
-    } else {
-      drawWidth = previewCanvas.width;
-      drawHeight = drawWidth / imageRatio;
-      offsetX = 0;
-      offsetY = (previewCanvas.height - drawHeight) / 2;
-    }
-
-    const tempCanvas = document.createElement("canvas");
-    const tempCtx = tempCanvas.getContext("2d");
-    tempCanvas.width = drawWidth;
-    tempCanvas.height = drawHeight;
-    tempCtx.drawImage(designImg, 0, 0, drawWidth, drawHeight);
-
-    if (selectedMaterial && selectedMaterial !== "No Material") {
-      const materialImg = await loadImage(selectedMaterial);
-      const materialCanvas = document.createElement("canvas");
-      const materialCtx = materialCanvas.getContext("2d");
-      materialCanvas.width = drawWidth;
-      materialCanvas.height = drawHeight;
-      materialCtx.drawImage(materialImg, 0, 0, drawWidth, drawHeight);
-
-      const materialData = materialCtx.getImageData(0, 0, drawWidth, drawHeight);
-      const designData = tempCtx.getImageData(0, 0, drawWidth, drawHeight);
-
-      for (let i = 0; i < designData.data.length; i += 4) {
-        const alpha = designData.data[i + 3] / 255;
-        const invAlpha = 1 - alpha;
-
-        // Blend the material with the design based on the design's alpha channel
-        designData.data[i] =
-          designData.data[i] * alpha + materialData.data[i] * invAlpha;
-        designData.data[i + 1] =
-          designData.data[i + 1] * alpha + materialData.data[i + 1] * invAlpha;
-        designData.data[i + 2] =
-          designData.data[i + 2] * alpha + materialData.data[i + 2] * invAlpha;
-        // Keep the original alpha value of the design
-        designData.data[i + 3] = 255;
+      if (canvasRatio > imageRatio) {
+        drawHeight = previewCanvas.height;
+        drawWidth = drawHeight * imageRatio;
+        offsetX = (previewCanvas.width - drawWidth) / 2;
+        offsetY = 0;
+      } else {
+        drawWidth = previewCanvas.width;
+        drawHeight = drawWidth / imageRatio;
+        offsetX = 0;
+        offsetY = (previewCanvas.height - drawHeight) / 2;
       }
 
-      tempCtx.putImageData(designData, 0, 0);
-    }
+      const tempCanvas = document.createElement("canvas");
+      const tempCtx = tempCanvas.getContext("2d");
+      tempCanvas.width = drawWidth;
+      tempCanvas.height = drawHeight;
+      tempCtx.drawImage(designImg, 0, 0, drawWidth, drawHeight);
 
-    ctx.drawImage(tempCanvas, offsetX, offsetY, drawWidth, drawHeight);
+      if (selectedMaterial && selectedMaterial !== "No Material") {
+        console.log("Selected material:", selectedMaterial);
+        const materialImg = await loadImage(selectedMaterial);
+        const materialCanvas = document.createElement("canvas");
+        const materialCtx = materialCanvas.getContext("2d");
+        materialCanvas.width = drawWidth;
+        materialCanvas.height = drawHeight;
+        materialCtx.drawImage(materialImg, 0, 0, drawWidth, drawHeight);
+
+        const materialData = materialCtx.getImageData(0, 0, drawWidth, drawHeight);
+        const designData = tempCtx.getImageData(0, 0, drawWidth, drawHeight);
+
+        for (let i = 0; i < designData.data.length; i += 4) {
+          const alpha = designData.data[i + 3] / 255;
+          const invAlpha = 1 - alpha;
+
+          // Blend the material with the design based on the design's alpha channel
+          designData.data[i] =
+            designData.data[i] * alpha + materialData.data[i] * invAlpha;
+          designData.data[i + 1] =
+            designData.data[i + 1] * alpha + materialData.data[i + 1] * invAlpha;
+          designData.data[i + 2] =
+            designData.data[i + 2] * alpha + materialData.data[i + 2] * invAlpha;
+          // Keep the original alpha value of the design
+          designData.data[i + 3] = 255;
+        }
+
+        tempCtx.putImageData(designData, 0, 0);
+      }
+
+      ctx.drawImage(tempCanvas, offsetX, offsetY, drawWidth, drawHeight);
+    }
   }
-}
+
   async function handleManufacturerChange() {
     const selectedManufacturer = manufacturerSelect.value;
     if (
