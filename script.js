@@ -10,6 +10,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   const materialSelect = document.getElementById("material-select");
   const previewCanvas = document.getElementById("preview-canvas");
   const ctx = previewCanvas.getContext("2d");
+  const materials = await fetchMaterials();
+    if (materials.length > 0) {
+      populateDropdown(materialSelect, materials);
+    } else {
+    console.log("No materials found.");
+}
+materialSelect.insertAdjacentHTML(
+  "afterbegin",
+  '<option value="No Material" selected>No Material</option>'
+);
 
   const CANVAS_WIDTH = 544;
   const CANVAS_HEIGHT = 544;
@@ -53,19 +63,31 @@ document.addEventListener("DOMContentLoaded", async () => {
       }));
   }
 
-  async function fetchMaterials() {
+async function fetchMaterials() {
+  try {
     const response = await fetch(
       `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${MATERIAL_FOLDER}`
     );
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.error("Materials folder not found. Please check the folder name and path.");
+      } else {
+        console.error("Failed to fetch materials:", response.status, response.statusText);
+      }
+      return [];
+    }
     const files = await response.json();
-    console.log("Fetched materials:", files); // Add this line
     return files
       .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
       .map((file) => ({
         name: file.name,
         url: `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/${MATERIAL_FOLDER}/${file.name}`
       }));
+  } catch (error) {
+    console.error("Error fetching materials:", error);
+    return [];
   }
+}
 
   function loadImage(src) {
     return new Promise((resolve, reject) => {
