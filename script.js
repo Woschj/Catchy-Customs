@@ -99,76 +99,73 @@ async function fetchMaterials() {
     });
   }
 
-  async function updatePreview() {
-    const selectedDesign = designSelect.value;
-    const selectedMaterial = materialSelect.value;
+async function updatePreview() {
+  const selectedDesign = designSelect.value;
+  const selectedMaterial = materialSelect.value;
 
-    if (selectedDesign) {
-      const designImg = await loadImage(selectedDesign);
-      ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+  if (selectedDesign) {
+    const designImg = await loadImage(selectedDesign);
+    ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
 
-      const canvasRatio = previewCanvas.width / previewCanvas.height;
-      const imageRatio = designImg.width / designImg.height;
-      let drawWidth, drawHeight, offsetX, offsetY;
+    const canvasRatio = previewCanvas.width / previewCanvas.height;
+    const imageRatio = designImg.width / designImg.height;
+    let drawWidth, drawHeight, offsetX, offsetY;
 
-      if (canvasRatio > imageRatio) {
-        drawHeight = previewCanvas.height;
-        drawWidth = drawHeight * imageRatio;
-        offsetX = (previewCanvas.width - drawWidth) / 2;
-        offsetY = 0;
-      } else {
-        drawWidth = previewCanvas.width;
-        drawHeight = drawWidth / imageRatio;
-        offsetX = 0;
-        offsetY = (previewCanvas.height - drawHeight) / 2;
-      }
+    if (canvasRatio > imageRatio) {
+      drawHeight = previewCanvas.height;
+      drawWidth = drawHeight * imageRatio;
+      offsetX = (previewCanvas.width - drawWidth) / 2;
+      offsetY = 0;
+    } else {
+      drawWidth = previewCanvas.width;
+      drawHeight = drawWidth / imageRatio;
+      offsetX = 0;
+      offsetY = (previewCanvas.height - drawHeight) / 2;
+    }
 
-      const tempCanvas = document.createElement("canvas");
-      const tempCtx = tempCanvas.getContext("2d");
-      tempCanvas.width = drawWidth;
-      tempCanvas.height = drawHeight;
-      tempCtx.drawImage(designImg, 0, 0, drawWidth, drawHeight);
+    const tempCanvas = document.createElement("canvas");
+    const tempCtx = tempCanvas.getContext("2d");
+    tempCanvas.width = drawWidth;
+    tempCanvas.height = drawHeight;
+    tempCtx.drawImage(designImg, 0, 0, drawWidth, drawHeight);
 
-      if (selectedMaterial && selectedMaterial !== "No Material") {
-        console.log("Selected material:", selectedMaterial); // Add this line
-        const materialImg = await loadImage(selectedMaterial);
-        const materialCanvas = document.createElement("canvas");
-        const materialCtx = materialCanvas.getContext("2d");
-        materialCanvas.width = drawWidth;
-        materialCanvas.height = drawHeight;
-        materialCtx.drawImage(materialImg, 0, 0, drawWidth, drawHeight);
+    if (selectedMaterial && selectedMaterial !== "No Material") {
+      const materialImg = await loadImage(selectedMaterial);
+      const materialCanvas = document.createElement("canvas");
+      const materialCtx = materialCanvas.getContext("2d");
+      materialCanvas.width = drawWidth;
+      materialCanvas.height = drawHeight;
+      materialCtx.drawImage(materialImg, 0, 0, drawWidth, drawHeight);
 
-        const materialData = materialCtx.getImageData(
-          0,
-          0,
-          drawWidth,
-          drawHeight
-        );
-        const designData = tempCtx.getImageData(0, 0, drawWidth, drawHeight);
+      const materialData = materialCtx.getImageData(0, 0, drawWidth, drawHeight);
+      const designData = tempCtx.getImageData(0, 0, drawWidth, drawHeight);
 
-        for (let i = 0; i < designData.data.length; i += 4) {
-          const alpha = designData.data[i + 3] / 255;
-          const invAlpha = 1 - alpha;
+      for (let i = 0; i < designData.data.length; i += 4) {
+        const alpha = designData.data[i + 3] / 255;
+        const invAlpha = 1 - alpha;
 
+        // Check if the design pixel is dark
+        const isDark = designData.data[i] + designData.data[i + 1] + designData.data[i + 2] < 128 * 3;
+
+        if (isDark) {
           // Blend the material with the design based on the design's alpha channel
           designData.data[i] =
             designData.data[i] * alpha + materialData.data[i] * invAlpha;
           designData.data[i + 1] =
-            designData.data[i + 1] * alpha +
-            materialData.data[i + 1] * invAlpha;
+            designData.data[i + 1] * alpha + materialData.data[i + 1] * invAlpha;
           designData.data[i + 2] =
-            designData.data[i + 2] * alpha +
-            materialData.data[i + 2] * invAlpha;
-          // Keep the original alpha value of the design
-          designData.data[i + 3] = 255;
+            designData.data[i + 2] * alpha + materialData.data[i + 2] * invAlpha;
         }
-
-        tempCtx.putImageData(designData, 0, 0);
+        // Keep the original alpha value of the design
+        designData.data[i + 3] = 255;
       }
 
-      ctx.drawImage(tempCanvas, offsetX, offsetY, drawWidth, drawHeight);
+      tempCtx.putImageData(designData, 0, 0);
     }
+
+    ctx.drawImage(tempCanvas, offsetX, offsetY, drawWidth, drawHeight);
   }
+}
 
   async function handleManufacturerChange() {
     const selectedManufacturer = manufacturerSelect.value;
