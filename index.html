@@ -11,10 +11,8 @@
       color: #e0e0e0;
       background-image: url('https://github.com/Woschj/Catchy-Customs/blob/main/CC_Logo_Wortmarke.png?raw=true');
       background-size: cover;
-      /* Hintergrundbild skalieren */
       background-repeat: no-repeat;
       background-attachment: fixed;
-      /* Hintergrundbild fixieren */
       background-position: center center;
     }
 
@@ -37,7 +35,6 @@
       flex-direction: column;
       align-items: flex-start;
       background: rgba(30, 30, 30, 0.8);
-      /* Hintergrund mit Transparenz */
       padding: 20px;
       border-radius: 10px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
@@ -77,7 +74,6 @@
       border-radius: 10px;
       box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
       background: rgba(30, 30, 30, 0.8);
-      /* Hintergrund mit Transparenz */
       position: relative;
     }
   </style>
@@ -119,6 +115,28 @@
       previewCanvas.width = CANVAS_WIDTH;
       previewCanvas.height = CANVAS_HEIGHT;
 
+      async function fetchFolders(folder) {
+        const response = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${folder}`);
+        const data = await response.json();
+        return data.map(item => item.name);
+      }
+
+      async function fetchMaterials() {
+        const response = await fetch(`https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${MATERIAL_FOLDER}`);
+        const data = await response.json();
+        return data.map(item => ({ name: item.name, url: item.download_url }));
+      }
+
+      function populateDropdown(selectElement, options, includeUrl = true) {
+        selectElement.innerHTML = '';
+        options.forEach(option => {
+          const optionElement = document.createElement("option");
+          optionElement.value = includeUrl ? option.url : option.name;
+          optionElement.textContent = option.name;
+          selectElement.appendChild(optionElement);
+        });
+      }
+
       function updatePreview() {
         const selectedDesign = designSelect.value;
         const selectedMaterial = materialSelect.value;
@@ -142,7 +160,6 @@
             }
             ctx.drawImage(designImg, offsetX, offsetY, drawWidth, drawHeight);
             const designData = ctx.getImageData(0, 0, previewCanvas.width, previewCanvas.height);
-            // Transparenz zu reinweißen Teilen des Designbilds hinzufügen
             for (let i = 0; i < designData.data.length; i += 4) {
               const r = designData.data[i];
               const g = designData.data[i + 1];
@@ -166,13 +183,11 @@
                 for (let i = 0; i < designData.data.length; i += 4) {
                   const alpha = designData.data[i + 3] / 255;
                   const designLuminance = grayscaleData.data[i] / 255;
-                  // Verwende Helligkeit als Proxy für Tiefe (höhere Helligkeit bedeutet näher am Betrachter)
                   const depth = 1 - designLuminance;
                   const materialR = materialData.data[i];
                   const materialG = materialData.data[i + 1];
                   const materialB = materialData.data[i + 2];
-                  // Material basierend auf Tiefe mit reduzierter Opazität (15% weniger) mischen
-                  const opacity = 0.75; // Angepasste Opazität
+                  const opacity = 0.75;
                   designData.data[i] = designData.data[i] * (1 - depth * opacity) + materialR * depth * opacity * alpha;
                   designData.data[i + 1] = designData.data[i + 1] * (1 - depth * opacity) + materialG * depth * opacity * alpha;
                   designData.data[i + 2] = designData.data[i + 2] * (1 - depth * opacity) + materialB * depth * opacity * alpha;
@@ -188,15 +203,47 @@
         }
       }
 
-      function handleManufacturerChange() {
-        // Vorhandener handleManufacturerChange-Code...
+      async function handleManufacturerChange() {
+        const selectedManufacturer = manufacturerSelect.value;
+        if (selectedManufacturer && selectedManufacturer !== "None") {
+          const models = await fetchFolders(`${DESIGN_FOLDER}/${selectedManufacturer}`);
+          populateDropdown(
+            modelSelect,
+            models.map((model) => ({
+              name: model,
+              url: model
+            })),
+            false
+          );
+          modelSelect.insertAdjacentHTML("afterbegin", '<option value="None" selected>None</option>');
+        } else {
+          modelSelect.innerHTML = '';
+          modelSelect.insertAdjacentHTML("afterbegin", '<option value="None" selected>None</option>');
+        }
       }
 
-      function handleModelChange() {
-        // Vorhandener handleModelChange-Code...
+      async function handleModelChange() {
+        const selectedManufacturer = manufacturerSelect.value;
+        const selectedModel = modelSelect.value;
+        if (selectedManufacturer && selectedManufacturer !== "None" && selectedModel && selectedModel !== "None") {
+          const designs = await fetchFolders(`${DESIGN_FOLDER}/${selectedManufacturer}/${selectedModel}`);
+          populateDropdown(
+            designSelect,
+            designs.map((design) => ({
+              name: design,
+              url: `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/${DESIGN_FOLDER}/${selectedManufacturer}/${selectedModel}/${design}`
+            }))
+          );
+          designSelect.insertAdjacentHTML("afterbegin", '<option value="None" selected>None</option>');
+        } else {
+          designSelect.innerHTML = '';
+          designSelect.insertAdjacentHTML("afterbegin", '<option value="None" selected>None</option>');
+        }
       }
+
       manufacturerSelect.addEventListener("change", handleManufacturerChange);
       modelSelect.addEventListener("change", handleModelChange);
+
       const manufacturers = await fetchFolders(DESIGN_FOLDER);
       populateDropdown(
         manufacturerSelect,
@@ -207,19 +254,45 @@
         false
       );
       manufacturerSelect.insertAdjacentHTML("afterbegin", '<option value="None" selected>None</option>');
+
       const materials = await fetchMaterials();
       populateDropdown(materialSelect, materials);
       materialSelect.insertAdjacentHTML(
         "afterbegin",
         '<option value="No Material" selected>No Material</option>'
       );
+
       designSelect.addEventListener("change", updatePreview);
       materialSelect.addEventListener("change", updatePreview);
-      // Initiale Vorschau-Aktualisierung
+
       if (designSelect.options.length > 0 && modelSelect.options.length > 0) {
         updatePreview();
       }
     });
+
+    async function loadImage(url) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = url;
+      });
+    }
+
+    function createGrayscaleImage(imageData) {
+      const grayscaleData = new ImageData(imageData.width, imageData.height);
+      for (let i = 0; i < imageData.data.length; i += 4) {
+        const r = imageData.data[i];
+        const g = imageData.data[i + 1];
+        const b = imageData.data[i + 2];
+        const luminance = (0.299 * r + 0.587 * g + 0.114 * b);
+        grayscaleData.data[i] = luminance;
+        grayscaleData.data[i + 1] = luminance;
+        grayscaleData.data[i + 2] = luminance;
+        grayscaleData.data[i + 3] = imageData.data[i + 3];
+      }
+      return grayscaleData;
+    }
   </script>
 </body>
 
