@@ -6,6 +6,154 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Catchy Cases</title>
   <link rel="stylesheet" href="styles.css">
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      color: #e0e0e0;
+      background-color: #121212;
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    h1 {
+      font-weight: 600;
+      margin-bottom: 20px;
+      color: #ffffff;
+      text-align: center;
+      font-size: 2rem;
+    }
+
+    #container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #main-content {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    #controls {
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      background: #1e1e1e;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      margin-bottom: 20px;
+    }
+
+    #controls label {
+      font-size: 14px;
+      margin-right: 10px;
+      color: #b3b3b3;
+    }
+
+    #controls select,
+    #controls input {
+      width: 150px;
+      padding: 10px;
+      margin-right: 20px;
+      border: 1px solid #333;
+      border-radius: 5px;
+      font-size: 16px;
+      font-family: inherit;
+      background: #2c2c2c;
+      color: #e0e0e0;
+      outline: none;
+      transition: border-color 0.2s ease;
+    }
+
+    #controls select:focus,
+    #controls input:focus {
+      border-color: #0071e3;
+    }
+
+    #canvas-container {
+      display: flex;
+      position: relative;
+    }
+
+    #preview-canvas {
+      border: 1px solid #333;
+      border-radius: 10px;
+      background: #1e1e1e;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+
+    #image-list-container {
+      display: flex;
+      flex-direction: column;
+      position: absolute;
+      left: -200px;
+      top: 0;
+    }
+
+    #image-list {
+      list-style-type: none;
+      padding: 0;
+      margin-top: 20px;
+      width: 150px;
+    }
+
+    #image-list li {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+      width: 100%;
+    }
+
+    #image-list button {
+      margin-left: 10px;
+      padding: 5px 10px;
+      border: none;
+      border-radius: 3px;
+      font-size: 14px;
+      cursor: pointer;
+      background-color: #444;
+      color: white;
+      transition: background-color 0.2s ease;
+    }
+
+    #image-list button:hover {
+      background-color: #666;
+    }
+
+    #edit-controls {
+      display: flex;
+      justify-content: center;
+      width: 100%;
+      margin-top: 20px;
+    }
+
+    #edit-controls button {
+      margin: 0 5px;
+      padding: 10px 20px;
+      border: none;
+      border-radius: 5px;
+      font-size: 16px;
+      cursor: pointer;
+      background-color: #333;
+      color: white;
+      transition: background-color 0.2s ease;
+    }
+
+    #edit-controls button:hover {
+      background-color: #555;
+    }
+
+    #custom-image-upload-container {
+      margin-top: 20px;
+      text-align: center;
+    }
+  </style>
 </head>
 
 <body>
@@ -23,16 +171,23 @@
 
       <label for="material-select">Material:</label>
       <select id="material-select"></select>
-
-      <input type="file" id="custom-image-upload" accept="image/*">
-      <button id="toggle-lock">Lock Custom Image</button>
-
-      <div id="zoomControls">
-        <button id="zoomIn">Zoom in</button>
-        <button id="zoomOut">Zoom out</button>
+    </div>
+    <div id="canvas-container">
+      <canvas id="preview-canvas"></canvas>
+      <div id="image-list-container">
+        <ul id="image-list"></ul>
       </div>
     </div>
-    <canvas id="preview-canvas"></canvas>
+    <div id="edit-controls">
+      <button id="stamp-image">Stempeln</button>
+      <button id="zoomIn">+</button>
+      <button id="zoomOut">-</button>
+      <button id="export-image">Bild exportieren</button>
+      <button id="remove-background">Hintergrund entfernen</button>
+    </div>
+    <div id="custom-image-upload-container">
+      <input type="file" id="custom-image-upload" accept="image/*">
+    </div>
   </div>
 
   <script src="script.js"></script>
