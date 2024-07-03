@@ -1,9 +1,11 @@
 document.addEventListener("DOMContentLoaded", async () => {
+  // Konstanten für den Repository-Eigentümer, den Repository-Namen und die Ordner für Designs und Materialien
   const REPO_OWNER = "Woschj";
   const REPO_NAME = "Catchy-Customs";
   const DESIGN_FOLDER = "design";
   const MATERIAL_FOLDER = "material";
 
+  // DOM-Elemente für die Auswahl von Herstellern, Modellen, Designs, Materialien und anderen Funktionen
   const manufacturerSelect = document.getElementById("manufacturer-select");
   const modelSelect = document.getElementById("model-select");
   const designSelect = document.getElementById("design-select");
@@ -17,11 +19,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   const previewCanvas = document.getElementById("preview-canvas");
   const ctx = previewCanvas.getContext("2d");
 
+  // Konstanten für die Canvas-Größe
   const CANVAS_WIDTH = 544;
   const CANVAS_HEIGHT = 544;
   previewCanvas.width = CANVAS_WIDTH;
   previewCanvas.height = CANVAS_HEIGHT;
 
+  // Variablen für das benutzerdefinierte Bild, Drag-and-Drop, Zoom und Positionierung
   let customImageFile = null;
   let customImagePreview = null;
   let isDragging = false;
@@ -31,52 +35,56 @@ document.addEventListener("DOMContentLoaded", async () => {
   let stampedImages = [];
   let removeBackground = false;
 
+  // Funktion zum Füllen von Dropdown-Menüs mit Elementen
   function populateDropdown(dropdown, items, selectFirst = true) {
-    dropdown.innerHTML = "";
+    dropdown.innerHTML = ""; // Leert das Dropdown-Menü
     items.forEach((item, index) => {
-      const option = document.createElement("option");
-      option.value = item.url;
-      option.textContent = item.name.replace(/\.[^/.]+$/, ""); // Remove file extension
-      dropdown.appendChild(option);
+      const option = document.createElement("option"); // Erstellt ein neues Option-Element
+      option.value = item.url; // Setzt den Wert der Option auf die URL des Elements
+      option.textContent = item.name.replace(/\.[^/.]+$/, ""); // Entfernt die Dateierweiterung aus dem Namen
+      dropdown.appendChild(option); // Fügt die Option zum Dropdown-Menü hinzu
     });
 
     if (selectFirst && items.length > 0) {
-      dropdown.selectedIndex = 0;
+      dropdown.selectedIndex = 0; // Wählt das erste Element im Dropdown-Menü aus
     }
   }
 
+  // Funktion zum Abrufen von Ordnern aus dem GitHub-Repository
   async function fetchFolders(folder) {
     const response = await fetch(
       `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${folder}`
     );
     const folders = await response.json();
     return folders
-      .filter((folder) => folder.type === "dir")
-      .map((folder) => folder.name);
+      .filter((folder) => folder.type === "dir") // Filtert nur die Ordner heraus
+      .map((folder) => folder.name); // Extrahiert die Namen der Ordner
   }
 
+  // Funktion zum Abrufen von Bildern aus einem bestimmten Ordner
   async function fetchImages(folder) {
     const response = await fetch(
       `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${DESIGN_FOLDER}/${folder}`
     );
     const files = await response.json();
     return files
-      .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
+      .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name)) // Filtert nur Bilddateien heraus
       .map((file) => ({
         name: file.name,
         url: `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/${DESIGN_FOLDER}/${folder}/${file.name}`
       }));
   }
 
+  // Funktion zum Abrufen von Materialien
   async function fetchMaterials() {
     const response = await fetch(
       `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${MATERIAL_FOLDER}`
     );
     const files = await response.json();
     return files
-      .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
+      .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name)) // Filtert nur Bilddateien heraus
       .map((file) => ({
-        name: file.name.replace(/\.[^/.]+$/, ""), // Remove file extension
+        name: file.name.replace(/\.[^/.]+$/, ""), // Entfernt die Dateierweiterung
         url:
           file.name === "Nichts"
             ? ""
@@ -84,16 +92,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       }));
   }
 
+  // Funktion zum Laden eines Bildes aus einer URL
   function loadImage(src) {
     return new Promise((resolve, reject) => {
       const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = reject;
+      img.onload = () => resolve(img); // Wenn das Bild geladen ist, wird das Promise aufgelöst
+      img.onerror = reject; // Wenn ein Fehler auftritt, wird das Promise zurückgewiesen
       img.crossOrigin = "Anonymous";
       img.src = src;
     });
   }
 
+  // Funktion, die ausgeführt wird, wenn sich die Auswahl des Herstellers ändert
   async function handleManufacturerChange() {
     const selectedManufacturer = manufacturerSelect.value;
     if (
@@ -116,6 +126,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  // Funktion, die ausgeführt wird, wenn sich die Auswahl des Modells ändert
   async function handleModelChange() {
     const selectedManufacturer = manufacturerSelect.value;
     const selectedModel = modelSelect.value;
@@ -124,7 +135,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const designs = images
         .filter((image) => image.name.startsWith(selectedModel))
         .map((image) => ({
-          name: image.name.split("_")[1].replace(/\.[^/.]+$/, ""), // Remove file extension
+          name: image.name.split("_")[1].replace(/\.[^/.]+$/, ""), // Entfernt die Dateierweiterung
           url: image.url
         }));
       populateDropdown(designSelect, designs);
@@ -136,9 +147,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  // Event-Listener für die Änderung des Herstellers und des Modells
   manufacturerSelect.addEventListener("change", handleManufacturerChange);
   modelSelect.addEventListener("change", handleModelChange);
 
+  // Hersteller-Ordner abrufen und in das Dropdown-Menü einfügen
   const manufacturers = await fetchFolders(DESIGN_FOLDER);
   populateDropdown(
     manufacturerSelect,
@@ -150,15 +163,18 @@ document.addEventListener("DOMContentLoaded", async () => {
   );
   manufacturerSelect.value = "Select Manufacturer";
 
+  // Materialien abrufen und in das Dropdown-Menü einfügen
   const materials = await fetchMaterials();
   populateDropdown(materialSelect, materials);
   materialSelect.value = materials.find(
     (material) => material.name === "Nichts"
   ).url;
 
+  // Event-Listener für die Änderung des Designs und des Materials
   designSelect.addEventListener("change", updatePreview);
   materialSelect.addEventListener("change", updatePreview);
 
+  // Funktion zum Aktualisieren der Vorschau
   async function updatePreview() {
     const selectedDesign = designSelect.value;
     const selectedMaterial = materialSelect.value;
@@ -166,7 +182,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (selectedDesign) {
       try {
         const designImg = await loadImage(selectedDesign);
-        ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height);
+        ctx.clearRect(0, 0, previewCanvas.width, previewCanvas.height); // Löscht die Canvas
 
         const canvasRatio = previewCanvas.width / previewCanvas.height;
         const imageRatio = designImg.width / designImg.height;
@@ -249,6 +265,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  // Funktion zum Erstellen eines Graustufenbilds
   function createGrayscaleImage(imageData) {
     const grayscaleData = new Uint8ClampedArray(imageData.data.length);
 
@@ -267,6 +284,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     return new ImageData(grayscaleData, imageData.width, imageData.height);
   }
 
+  // Event-Listener für das Hochladen eines benutzerdefinierten Bilds
   customImageUpload.addEventListener("change", handleCustomImageUpload);
   stampButton.addEventListener("click", stampImage);
   zoomInButton.addEventListener("click", zoomIn);
@@ -274,6 +292,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   exportButton.addEventListener("click", exportImage);
   removeBackgroundButton.addEventListener("click", toggleRemoveBackground);
 
+  // Funktion zum Verarbeiten des benutzerdefinierten Bilduploads
   function handleCustomImageUpload(event) {
     customImageFile = event.target.files[0];
     if (customImageFile) {
@@ -287,6 +306,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  // Funktion zum Zeichnen des benutzerdefinierten Bilds auf der Canvas
   function drawCustomImage() {
     const canvas = document.getElementById("preview-canvas");
     const ctx = canvas.getContext("2d");
@@ -352,12 +372,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
-  function startDrag(event) {
-    isDragging = true;
-    offset.x = event.offsetX - customImagePosition.x;
-    offset.y = event.offsetY - customImagePosition.y;
-  }
-
+  // Funktionen für das Drag-and-Drop des benutzerdefinierten Bilds
   function drag(event) {
     if (isDragging) {
       const canvas = document.getElementById("preview-canvas");
@@ -376,19 +391,21 @@ document.addEventListener("DOMContentLoaded", async () => {
     isDragging = false;
   }
 
+  // Funktion zum Zoomen des benutzerdefinierten Bilds
   function zoomIn() {
-    scale += 0.1;
+    scale += 0.1; // Erhöht die Zoom-Stufe um 0.1
     updatePreview();
   }
 
   function zoomOut() {
-    scale -= 0.1;
+    scale -= 0.1; // Verringert die Zoom-Stufe um 0.1
     if (scale < 0.1) {
-      scale = 0.1;
+      scale = 0.1; // Stellt sicher, dass die Zoom-Stufe nicht unter 0.1 fällt
     }
     updatePreview();
   }
 
+  // Funktion zum Stempeln des benutzerdefinierten Bilds auf der Canvas
   function stampImage() {
     if (customImagePreview) {
       const canvas = document.createElement("canvas");
@@ -435,6 +452,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
   }
 
+  // Funktion zum Aktualisieren der Liste der gestempelten Bilder
   function updateImageList() {
     const imageList = document.getElementById("image-list");
     imageList.innerHTML = "";
@@ -453,6 +471,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     });
   }
 
+  // Funktion zum Exportieren des Bilds
   function exportImage() {
     const canvas = document.getElementById("preview-canvas");
     const link = document.createElement("a");
@@ -461,6 +480,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     link.click();
   }
 
+  // Funktion zum Umschalten des Hintergrund-Entfernungsmodus
   function toggleRemoveBackground() {
     removeBackground = !removeBackground;
     removeBackgroundButton.textContent = removeBackground
@@ -469,6 +489,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     updatePreview();
   }
 
+  // Event-Listener für das Drag-and-Drop des benutzerdefinierten Bilds
   previewCanvas.addEventListener("mousedown", startDrag);
   previewCanvas.addEventListener("mousemove", drag);
   previewCanvas.addEventListener("mouseup", endDrag);
