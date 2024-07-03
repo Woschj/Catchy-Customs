@@ -373,6 +373,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   }
 
   // Funktionen für das Drag-and-Drop des benutzerdefinierten Bilds
+  function startDrag(event) {
+    isDragging = true;
+    offset.x = event.offsetX - customImagePosition.x;
+    offset.y = event.offsetY - customImagePosition.y;
+  }
   function drag(event) {
     if (isDragging) {
       const canvas = document.getElementById("preview-canvas");
