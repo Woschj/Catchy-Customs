@@ -32,7 +32,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   let stampedImages = [];
   let removeBackground = false;
   let designBounds = { x: 0, y: 0, width: CANVAS_WIDTH, height: CANVAS_HEIGHT };
-  let darkAreaBounds = { x: 0, y: 0, width: 0, height: 0 };
 
   function populateDropdown(dropdown, items, selectFirst = true) {
     dropdown.innerHTML = "";
@@ -244,9 +243,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         if (customImagePreview) {
           drawCustomImage();
         }
-
-        // Calculate dark area bounds
-        calculateDarkAreaBounds();
       } catch (error) {
         console.error("Error loading images:", error);
       }
@@ -269,40 +265,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     return grayscaleData;
   }
 
-  function calculateDarkAreaBounds() {
-    const designData = ctx.getImageData(
-      designBounds.x,
-      designBounds.y,
-      designBounds.width,
-      designBounds.height
-    );
-    const grayscaleData = createGrayscaleImage(designData);
-
-    let minX = designBounds.width;
-    let minY = designBounds.height;
-    let maxX = 0;
-    let maxY = 0;
-
-    for (let i = 0; i < grayscaleData.data.length; i += 4) {
-      const luminance = grayscaleData.data[i] / 255;
-      if (luminance < 0.5) {
-        const x = (i / 4) % designBounds.width;
-        const y = Math.floor(i / 4 / designBounds.width);
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
-    }
-
-    darkAreaBounds = {
-      x: designBounds.x + minX,
-      y: designBounds.y + minY,
-      width: maxX - minX,
-      height: maxY - minY
-    };
-  }
-
   customImageUpload.addEventListener("change", (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -312,8 +274,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         customImagePreview = new Image();
         customImagePreview.onload = () => {
           customImagePosition = {
-            x: darkAreaBounds.x,
-            y: darkAreaBounds.y
+            x: (CANVAS_WIDTH - customImagePreview.width) / 2,
+            y: (CANVAS_HEIGHT - customImagePreview.height) / 2
           };
           updatePreview();
         };
@@ -337,8 +299,8 @@ document.addEventListener("DOMContentLoaded", async () => {
   previewCanvas.addEventListener("mousemove", (event) => {
     if (isDragging) {
       const { x, y } = getCanvasCoordinates(event);
-      customImagePosition.x = Math.max(darkAreaBounds.x, Math.min(x - offset.x, darkAreaBounds.x + darkAreaBounds.width - customImagePreview.width * scale));
-      customImagePosition.y = Math.max(darkAreaBounds.y, Math.min(y - offset.y, darkAreaBounds.y + darkAreaBounds.height - customImagePreview.height * scale));
+      customImagePosition.x = x - offset.x;
+      customImagePosition.y = y - offset.y;
       updatePreview();
     }
   });
@@ -373,6 +335,17 @@ document.addEventListener("DOMContentLoaded", async () => {
     const scaledWidth = customImagePreview.width * scale;
     const scaledHeight = customImagePreview.height * scale;
 
+    const designData = ctx.getImageData(x, y, scaledWidth, scaledHeight);
+    const grayscaleData = createGrayscaleImage(designData);
+
+    for (let i = 0; i < designData.data.length; i += 4) {
+      const luminance = grayscaleData.data[i] / 255;
+      if (luminance > 0.5) {
+        designData.data[i + 3] = 0; // Set alpha to 0 for lighter areas
+      }
+    }
+
+    ctx.putImageData(designData, x, y);
     ctx.drawImage(customImagePreview, x, y, scaledWidth, scaledHeight);
   }
 
