@@ -303,13 +303,20 @@ document.addEventListener("DOMContentLoaded", async () => {
   previewCanvas.addEventListener("mousemove", (event) => {
     if (isDragging) {
       const { x, y } = getCanvasCoordinates(event);
-      const newX = x - offset.x;
-      const newY = y - offset.y;
-      if (isInsideDesignBounds(newX, newY)) {
-        customImagePosition.x = newX;
-        customImagePosition.y = newY;
-        updatePreview();
-      }
+      let newX = x - offset.x;
+      let newY = y - offset.y;
+
+      // Ensure the custom image stays within the design bounds
+      if (newX < designBounds.x) newX = designBounds.x;
+      if (newX + customImagePreview.width * scale > designBounds.x + designBounds.width)
+        newX = designBounds.x + designBounds.width - customImagePreview.width * scale;
+      if (newY < designBounds.y) newY = designBounds.y;
+      if (newY + customImagePreview.height * scale > designBounds.y + designBounds.height)
+        newY = designBounds.y + designBounds.height - customImagePreview.height * scale;
+
+      customImagePosition.x = newX;
+      customImagePosition.y = newY;
+      updatePreview();
     }
   });
 
@@ -335,15 +342,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       x <= customImagePosition.x + customImagePreview.width * scale &&
       y >= customImagePosition.y &&
       y <= customImagePosition.y + customImagePreview.height * scale
-    );
-  }
-
-  function isInsideDesignBounds(x, y) {
-    return (
-      x >= designBounds.x &&
-      x + customImagePreview.width * scale <= designBounds.x + designBounds.width &&
-      y >= designBounds.y &&
-      y + customImagePreview.height * scale <= designBounds.y + designBounds.height
     );
   }
 
