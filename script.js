@@ -18,7 +18,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   const removeBackgroundButton = document.getElementById("remove-background");
   const previewCanvas = document.getElementById("preview-canvas");
   const ctx = previewCanvas.getContext("2d");
-  const imageList = document.getElementById("image-list");
+  const colorPicker = document.getElementById("color-picker");
+  const toleranceSlider = document.getElementById("tolerance-slider");
+  const stampList = document.getElementById("stamp-list");
+  const colorPickerPreview = document.getElementById("color-picker-preview");
 
   previewCanvas.width = CANVAS_WIDTH;
   previewCanvas.height = CANVAS_HEIGHT;
@@ -32,6 +35,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   let stampedImages = [];
   let removeBackground = false;
   let designBounds = { x: 0, y: 0, width: CANVAS_WIDTH, height: CANVAS_HEIGHT };
+  let darkAreaBounds = { x: 0, y: 0, width: 0, height: 0 };
+  let selectedColor = colorPicker.value;
+  let tolerance = toleranceSlider.value;
+  let selectedStampIndex = -1;
 
   function populateDropdown(dropdown, items, selectFirst = true) {
     dropdown.innerHTML = "";
@@ -236,13 +243,21 @@ document.addEventListener("DOMContentLoaded", async () => {
           ctx.putImageData(designData, offsetX, offsetY);
         }
 
-        stampedImages.forEach(({ image, position, width, height }) => {
-          ctx.drawImage(image, position.x, position.y, width, height);
-        });
+        stampedImages.forEach(
+          ({ image, position, width, height, color, tolerance }, index) => {
+            if (index === selectedStampIndex) {
+              drawCustomImage(image, position, width, height, color, tolerance);
+            } else {
+              ctx.drawImage(image, position.x, position.y, width, height);
+            }
+          }
+        );
 
-        if (customImagePreview) {
+        if (customImagePreview && selectedStampIndex === -1) {
           drawCustomImage();
         }
+
+        calculateDarkAreaBounds();
       } catch (error) {
         console.error("Error loading images:", error);
       }
@@ -265,6 +280,40 @@ document.addEventListener("DOMContentLoaded", async () => {
     return grayscaleData;
   }
 
+  function calculateDarkAreaBounds() {
+    const designData = ctx.getImageData(
+      designBounds.x,
+      designBounds.y,
+      designBounds.width,
+      designBounds.height
+    );
+    const grayscaleData = createGrayscaleImage(designData);
+
+    let minX = designBounds.width;
+    let minY = designBounds.height;
+    let maxX = 0;
+    let maxY = 0;
+
+    for (let i = 0; i < grayscaleData.data.length; i += 4) {
+      const luminance = grayscaleData.data[i] / 255;
+      if (luminance < 0.5) {
+        const x = (i / 4) % designBounds.width;
+        const y = Math.floor(i / 4 / designBounds.width);
+        if (x < minX) minX = x;
+        if (x > maxX) maxX = x;
+        if (y < minY) minY = y;
+        if (y > maxY) maxY = y;
+      }
+    }
+
+    darkAreaBounds = {
+      x: designBounds.x + minX,
+      y: designBounds.y + minY,
+      width: maxX - minX,
+      height: maxY - minY
+    };
+  }
+
   customImageUpload.addEventListener("change", (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -274,9 +323,10 @@ document.addEventListener("DOMContentLoaded", async () => {
         customImagePreview = new Image();
         customImagePreview.onload = () => {
           customImagePosition = {
-            x: (CANVAS_WIDTH - customImagePreview.width) / 2,
-            y: (CANVAS_HEIGHT - customImagePreview.height) / 2
+            x: darkAreaBounds.x,
+            y: darkAreaBounds.y
           };
+          scaleCustomImage();
           updatePreview();
         };
         customImagePreview.src = e.target.result;
@@ -284,6 +334,21 @@ document.addEventListener("DOMContentLoaded", async () => {
       reader.readAsDataURL(file);
     }
   });
+
+  function scaleCustomImage() {
+    const maxWidth = darkAreaBounds.width;
+    const maxHeight = darkAreaBounds.height;
+    const imageWidth = customImagePreview.width;
+    const imageHeight = customImagePreview.height;
+
+    if (imageWidth > maxWidth || imageHeight > maxHeight) {
+      const widthRatio = maxWidth / imageWidth;
+      const heightRatio = maxHeight / imageHeight;
+      scale = Math.min(widthRatio, heightRatio);
+    } else {
+      scale = 1;
+    }
+  }
 
   previewCanvas.addEventListener("mousedown", (event) => {
     if (customImagePreview) {
@@ -299,8 +364,24 @@ document.addEventListener("DOMContentLoaded", async () => {
   previewCanvas.addEventListener("mousemove", (event) => {
     if (isDragging) {
       const { x, y } = getCanvasCoordinates(event);
-      customImagePosition.x = x - offset.x;
-      customImagePosition.y = y - offset.y;
+      customImagePosition.x = Math.max(
+        darkAreaBounds.x,
+        Math.min(
+          x - offset.x,
+          darkAreaBounds.x +
+            darkAreaBounds.width -
+            customImagePreview.width * scale
+        )
+      );
+      customImagePosition.y = Math.max(
+        darkAreaBounds.y,
+        Math.min(
+          y - offset.y,
+          darkAreaBounds.y +
+            darkAreaBounds.height -
+            customImagePreview.height * scale
+        )
+      );
       updatePreview();
     }
   });
@@ -330,23 +411,63 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
   }
 
-  function drawCustomImage() {
-    const { x, y } = customImagePosition;
-    const scaledWidth = customImagePreview.width * scale;
-    const scaledHeight = customImagePreview.height * scale;
+  function drawCustomImage(
+    image = customImagePreview,
+    position = customImagePosition,
+    width = customImagePreview.width * scale,
+    height = customImagePreview.height * scale,
+    color = selectedColor,
+    tolerance = toleranceSlider.value
+  ) {
+    const { x, y } = position;
 
-    const designData = ctx.getImageData(x, y, scaledWidth, scaledHeight);
-    const grayscaleData = createGrayscaleImage(designData);
+    if (removeBackground) {
+      const tempCanvas = document.createElement("canvas");
+      const tempCtx = tempCanvas.getContext("2d");
+      tempCanvas.width = image.width;
+      tempCanvas.height = image.height;
+      tempCtx.drawImage(image, 0, 0);
 
-    for (let i = 0; i < designData.data.length; i += 4) {
-      const luminance = grayscaleData.data[i] / 255;
-      if (luminance > 0.5) {
-        designData.data[i + 3] = 0; // Set alpha to 0 for lighter areas
+      const imageData = tempCtx.getImageData(0, 0, image.width, image.height);
+      const data = imageData.data;
+
+      const [r1, g1, b1] = hexToRgb(color);
+      const toleranceValue = parseInt(tolerance, 10);
+
+      for (let i = 0; i < data.length; i += 4) {
+        const r2 = data[i];
+        const g2 = data[i + 1];
+        const b2 = data[i + 2];
+
+        if (colorWithinTolerance(r1, g1, b1, r2, g2, b2, toleranceValue)) {
+          data[i + 3] = 0; // Alpha-Kanal auf 0 setzen, um den Hintergrund transparent zu machen
+        }
       }
-    }
 
-    ctx.putImageData(designData, x, y);
-    ctx.drawImage(customImagePreview, x, y, scaledWidth, scaledHeight);
+      tempCtx.putImageData(imageData, 0, 0);
+      ctx.drawImage(tempCanvas, x, y, width, height);
+    } else {
+      ctx.drawImage(image, x, y, width, height);
+    }
+  }
+
+  function hexToRgb(hex) {
+    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+    return result
+      ? [
+          parseInt(result[1], 16),
+          parseInt(result[2], 16),
+          parseInt(result[3], 16)
+        ]
+      : null;
+  }
+
+  function colorWithinTolerance(r1, g1, b1, r2, g2, b2, tolerance) {
+    return (
+      Math.abs(r1 - r2) <= tolerance &&
+      Math.abs(g1 - g2) <= tolerance &&
+      Math.abs(b1 - b2) <= tolerance
+    );
   }
 
   stampButton.addEventListener("click", () => {
@@ -355,37 +476,71 @@ document.addEventListener("DOMContentLoaded", async () => {
         image: customImagePreview,
         position: { ...customImagePosition },
         width: customImagePreview.width * scale,
-        height: customImagePreview.height * scale
+        height: customImagePreview.height * scale,
+        color: selectedColor,
+        tolerance: tolerance
       };
       stampedImages.push(stamp);
       customImageFile = null;
       customImagePreview = null;
       updatePreview();
-      updateImageList();
+      updateStampList();
     }
   });
 
-  function updateImageList() {
-    imageList.innerHTML = "";
+  function updateStampList() {
+    stampList.innerHTML = "";
     stampedImages.forEach((stamp, index) => {
       const li = document.createElement("li");
       li.textContent = `Stamp ${index + 1}`;
+      if (index === selectedStampIndex) {
+        li.classList.add("selected");
+      }
+      li.addEventListener("click", () => {
+        selectedStampIndex = index;
+        updatePreview();
+        updateStampList();
+      });
+      const editButton = document.createElement("button");
+      editButton.textContent = "Edit";
+      editButton.addEventListener("click", () => {
+        selectedStampIndex = index;
+        customImagePreview = stamp.image;
+        customImagePosition = { ...stamp.position };
+        scale = stamp.width / stamp.image.width;
+        colorPicker.value = stamp.color;
+        toleranceSlider.value = stamp.tolerance;
+        colorPickerPreview.style.backgroundColor = stamp.color;
+        updatePreview();
+        updateStampList();
+      });
+      li.appendChild(editButton);
       const removeButton = document.createElement("button");
       removeButton.textContent = "Remove";
       removeButton.addEventListener("click", () => {
         stampedImages.splice(index, 1);
+        selectedStampIndex = -1;
         updatePreview();
-        updateImageList();
+        updateStampList();
       });
       li.appendChild(removeButton);
-      imageList.appendChild(li);
+      stampList.appendChild(li);
     });
   }
 
   zoomInButton.addEventListener("click", () => {
     if (customImagePreview) {
-      scale += 0.1;
-      updatePreview();
+      const newScale = scale + 0.1;
+      const scaledWidth = customImagePreview.width * newScale;
+      const scaledHeight = customImagePreview.height * newScale;
+
+      if (
+        scaledWidth <= darkAreaBounds.width &&
+        scaledHeight <= darkAreaBounds.height
+      ) {
+        scale = newScale;
+        updatePreview();
+      }
     }
   });
 
@@ -405,6 +560,17 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   removeBackgroundButton.addEventListener("click", () => {
     removeBackground = !removeBackground;
+    updatePreview();
+  });
+
+  colorPicker.addEventListener("change", () => {
+    selectedColor = colorPicker.value;
+    colorPickerPreview.style.backgroundColor = selectedColor;
+    updatePreview();
+  });
+
+  toleranceSlider.addEventListener("input", () => {
+    tolerance = toleranceSlider.value;
     updatePreview();
   });
 });
