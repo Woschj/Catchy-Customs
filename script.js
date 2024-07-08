@@ -3,7 +3,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const REPO_NAME = "Catchy-Customs";
   const DESIGN_FOLDER = "design";
   const MATERIAL_FOLDER = "material";
-  const STAMP_FOLDER = "stamps"; // New folder for stamps
   const CANVAS_WIDTH = 544;
   const CANVAS_HEIGHT = 544;
 
@@ -11,7 +10,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   const modelSelect = document.getElementById("model-select");
   const designSelect = document.getElementById("design-select");
   const materialSelect = document.getElementById("material-select");
-  const stampSelect = document.getElementById("stamp-select"); // New stamp dropdown
   const customImageUpload = document.getElementById("custom-image-upload");
   const stampButton = document.getElementById("stamp-image");
   const zoomInButton = document.getElementById("zoomIn");
@@ -20,10 +18,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const removeBackgroundButton = document.getElementById("remove-background");
   const previewCanvas = document.getElementById("preview-canvas");
   const ctx = previewCanvas.getContext("2d");
-  const colorPicker = document.getElementById("color-picker");
-  const toleranceSlider = document.getElementById("tolerance-slider");
-  const stampList = document.getElementById("stamp-list");
-  const colorPickerPreview = document.getElementById("color-picker-preview");
+  const imageList = document.getElementById("image-list");
 
   previewCanvas.width = CANVAS_WIDTH;
   previewCanvas.height = CANVAS_HEIGHT;
@@ -37,10 +32,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   let stampedImages = [];
   let removeBackground = false;
   let designBounds = { x: 0, y: 0, width: CANVAS_WIDTH, height: CANVAS_HEIGHT };
-  let darkAreaBounds = { x: 0, y: 0, width: 0, height: 0 };
-  let selectedColor = colorPicker.value;
-  let tolerance = toleranceSlider.value;
-  let selectedStampIndex = -1;
 
   function populateDropdown(dropdown, items, selectFirst = true) {
     dropdown.innerHTML = "";
@@ -92,19 +83,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           file.name === "Nichts"
             ? ""
             : `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/${MATERIAL_FOLDER}/${file.name}`
-      }));
-  }
-
-  async function fetchStamps() {
-    const response = await fetch(
-      `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${STAMP_FOLDER}`
-    );
-    const files = await response.json();
-    return files
-      .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
-      .map((file) => ({
-        name: file.name,
-        url: `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/${STAMP_FOLDER}/${file.name}`
       }));
   }
 
@@ -177,9 +155,6 @@ document.addEventListener("DOMContentLoaded", async () => {
   materialSelect.value = materials.find(
     (material) => material.name === "Nichts"
   ).url;
-
-  const stamps = await fetchStamps(); // Fetch stamps
-  populateDropdown(stampSelect, stamps); // Populate stamp dropdown
 
   designSelect.addEventListener("change", updatePreview);
   materialSelect.addEventListener("change", updatePreview);
@@ -261,21 +236,13 @@ document.addEventListener("DOMContentLoaded", async () => {
           ctx.putImageData(designData, offsetX, offsetY);
         }
 
-        stampedImages.forEach(
-          ({ image, position, width, height, color, tolerance }, index) => {
-            if (index === selectedStampIndex) {
-              drawCustomImage(image, position, width, height, color, tolerance);
-            } else {
-              ctx.drawImage(image, position.x, position.y, width, height);
-            }
-          }
-        );
+        stampedImages.forEach(({ image, position, width, height }) => {
+          ctx.drawImage(image, position.x, position.y, width, height);
+        });
 
-        if (customImagePreview && selectedStampIndex === -1) {
+        if (customImagePreview) {
           drawCustomImage();
         }
-
-        calculateDarkAreaBounds();
       } catch (error) {
         console.error("Error loading images:", error);
       }
@@ -298,40 +265,6 @@ document.addEventListener("DOMContentLoaded", async () => {
     return grayscaleData;
   }
 
-  function calculateDarkAreaBounds() {
-    const designData = ctx.getImageData(
-      designBounds.x,
-      designBounds.y,
-      designBounds.width,
-      designBounds.height
-    );
-    const grayscaleData = createGrayscaleImage(designData);
-
-    let minX = designBounds.width;
-    let minY = designBounds.height;
-    let maxX = 0;
-    let maxY = 0;
-
-    for (let i = 0; i < grayscaleData.data.length; i += 4) {
-      const luminance = grayscaleData.data[i] / 255;
-      if (luminance < 0.5) {
-        const x = (i / 4) % designBounds.width;
-        const y = Math.floor(i / 4 / designBounds.width);
-        if (x < minX) minX = x;
-        if (x > maxX) maxX = x;
-        if (y < minY) minY = y;
-        if (y > maxY) maxY = y;
-      }
-    }
-
-    darkAreaBounds = {
-      x: designBounds.x + minX,
-      y: designBounds.y + minY,
-      width: maxX - minX,
-      height: maxY - minY
-    };
-  }
-
   customImageUpload.addEventListener("change", (event) => {
     const file = event.target.files[0];
     if (file) {
@@ -340,11 +273,14 @@ document.addEventListener("DOMContentLoaded", async () => {
       reader.onload = (e) => {
         customImagePreview = new Image();
         customImagePreview.onload = () => {
+          scale = Math.min(
+            designBounds.width / customImagePreview.width,
+            designBounds.height / customImagePreview.height
+          );
           customImagePosition = {
-            x: darkAreaBounds.x,
-            y: darkAreaBounds.y
+            x: designBounds.x,
+            y: designBounds.y
           };
-          scaleCustomImage();
           updatePreview();
         };
         customImagePreview.src = e.target.result;
@@ -352,21 +288,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       reader.readAsDataURL(file);
     }
   });
-
-  function scaleCustomImage() {
-    const maxWidth = darkAreaBounds.width;
-    const maxHeight = darkAreaBounds.height;
-    const imageWidth = customImagePreview.width;
-    const imageHeight = customImagePreview.height;
-
-    if (imageWidth > maxWidth || imageHeight > maxHeight) {
-      const widthRatio = maxWidth / imageWidth;
-      const heightRatio = maxHeight / imageHeight;
-      scale = Math.min(widthRatio, heightRatio);
-    } else {
-      scale = 1;
-    }
-  }
 
   previewCanvas.addEventListener("mousedown", (event) => {
     if (customImagePreview) {
@@ -382,25 +303,13 @@ document.addEventListener("DOMContentLoaded", async () => {
   previewCanvas.addEventListener("mousemove", (event) => {
     if (isDragging) {
       const { x, y } = getCanvasCoordinates(event);
-      customImagePosition.x = Math.max(
-        darkAreaBounds.x,
-        Math.min(
-          x - offset.x,
-          darkAreaBounds.x +
-            darkAreaBounds.width -
-            customImagePreview.width * scale
-        )
-      );
-      customImagePosition.y = Math.max(
-        darkAreaBounds.y,
-        Math.min(
-          y - offset.y,
-          darkAreaBounds.y +
-            darkAreaBounds.height -
-            customImagePreview.height * scale
-        )
-      );
-      updatePreview();
+      const newX = x - offset.x;
+      const newY = y - offset.y;
+      if (isInsideDesignBounds(newX, newY)) {
+        customImagePosition.x = newX;
+        customImagePosition.y = newY;
+        updatePreview();
+      }
     }
   });
 
@@ -429,63 +338,32 @@ document.addEventListener("DOMContentLoaded", async () => {
     );
   }
 
-  function drawCustomImage(
-    image = customImagePreview,
-    position = customImagePosition,
-    width = customImagePreview.width * scale,
-    height = customImagePreview.height * scale,
-    color = selectedColor,
-    tolerance = toleranceSlider.value
-  ) {
-    const { x, y } = position;
-
-    if (removeBackground) {
-      const tempCanvas = document.createElement("canvas");
-      const tempCtx = tempCanvas.getContext("2d");
-      tempCanvas.width = image.width;
-      tempCanvas.height = image.height;
-      tempCtx.drawImage(image, 0, 0);
-
-      const imageData = tempCtx.getImageData(0, 0, image.width, image.height);
-      const data = imageData.data;
-
-      const [r1, g1, b1] = hexToRgb(color);
-      const toleranceValue = parseInt(tolerance, 10);
-
-      for (let i = 0; i < data.length; i += 4) {
-        const r2 = data[i];
-        const g2 = data[i + 1];
-        const b2 = data[i + 2];
-
-        if (colorWithinTolerance(r1, g1, b1, r2, g2, b2, toleranceValue)) {
-          data[i + 3] = 0; // Alpha-Kanal auf 0 setzen, um den Hintergrund transparent zu machen
-        }
-      }
-
-      tempCtx.putImageData(imageData, 0, 0);
-      ctx.drawImage(tempCanvas, x, y, width, height);
-    } else {
-      ctx.drawImage(image, x, y, width, height);
-    }
-  }
-
-  function hexToRgb(hex) {
-    const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-    return result
-      ? [
-          parseInt(result[1], 16),
-          parseInt(result[2], 16),
-          parseInt(result[3], 16)
-        ]
-      : null;
-  }
-
-  function colorWithinTolerance(r1, g1, b1, r2, g2, b2, tolerance) {
+  function isInsideDesignBounds(x, y) {
     return (
-      Math.abs(r1 - r2) <= tolerance &&
-      Math.abs(g1 - g2) <= tolerance &&
-      Math.abs(b1 - b2) <= tolerance
+      x >= designBounds.x &&
+      x + customImagePreview.width * scale <= designBounds.x + designBounds.width &&
+      y >= designBounds.y &&
+      y + customImagePreview.height * scale <= designBounds.y + designBounds.height
     );
+  }
+
+  function drawCustomImage() {
+    const { x, y } = customImagePosition;
+    const scaledWidth = customImagePreview.width * scale;
+    const scaledHeight = customImagePreview.height * scale;
+
+    const designData = ctx.getImageData(x, y, scaledWidth, scaledHeight);
+    const grayscaleData = createGrayscaleImage(designData);
+
+    for (let i = 0; i < designData.data.length; i += 4) {
+      const luminance = grayscaleData.data[i] / 255;
+      if (luminance > 0.5) {
+        designData.data[i + 3] = 0; // Set alpha to 0 for lighter areas
+      }
+    }
+
+    ctx.putImageData(designData, x, y);
+    ctx.drawImage(customImagePreview, x, y, scaledWidth, scaledHeight);
   }
 
   stampButton.addEventListener("click", () => {
@@ -494,67 +372,41 @@ document.addEventListener("DOMContentLoaded", async () => {
         image: customImagePreview,
         position: { ...customImagePosition },
         width: customImagePreview.width * scale,
-        height: customImagePreview.height * scale,
-        color: selectedColor,
-        tolerance: tolerance
+        height: customImagePreview.height * scale
       };
       stampedImages.push(stamp);
       customImageFile = null;
       customImagePreview = null;
       updatePreview();
-      updateStampList();
+      updateImageList();
     }
   });
 
-  function updateStampList() {
-    stampList.innerHTML = "";
+  function updateImageList() {
+    imageList.innerHTML = "";
     stampedImages.forEach((stamp, index) => {
       const li = document.createElement("li");
-      li.textContent = `Stamp ${index + 1}`;
-      if (index === selectedStampIndex) {
-        li.classList.add("selected");
-      }
-      li.addEventListener("click", () => {
-        selectedStampIndex = index;
-        updatePreview();
-        updateStampList();
-      });
-      const editButton = document.createElement("button");
-      editButton.textContent = "Edit";
-      editButton.addEventListener("click", () => {
-        selectedStampIndex = index;
-        customImagePreview = stamp.image;
-        customImagePosition = { ...stamp.position };
-        scale = stamp.width / stamp.image.width;
-        colorPicker.value = stamp.color;
-        toleranceSlider.value = stamp.tolerance;
-        colorPickerPreview.style.backgroundColor = stamp.color;
-        updatePreview();
-        updateStampList();
-      });
-      li.appendChild(editButton);
+      li.textContent = `Stempel ${index + 1}`;
       const removeButton = document.createElement("button");
       removeButton.textContent = "Remove";
       removeButton.addEventListener("click", () => {
         stampedImages.splice(index, 1);
-        selectedStampIndex = -1;
         updatePreview();
-        updateStampList();
+        updateImageList();
       });
       li.appendChild(removeButton);
-      stampList.appendChild(li);
+      imageList.appendChild(li);
     });
   }
 
   zoomInButton.addEventListener("click", () => {
     if (customImagePreview) {
       const newScale = scale + 0.1;
-      const scaledWidth = customImagePreview.width * newScale;
-      const scaledHeight = customImagePreview.height * newScale;
-
+      const newWidth = customImagePreview.width * newScale;
+      const newHeight = customImagePreview.height * newScale;
       if (
-        scaledWidth <= darkAreaBounds.width &&
-        scaledHeight <= darkAreaBounds.height
+        newWidth <= designBounds.width &&
+        newHeight <= designBounds.height
       ) {
         scale = newScale;
         updatePreview();
@@ -564,7 +416,8 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   zoomOutButton.addEventListener("click", () => {
     if (customImagePreview) {
-      scale = Math.max(0.1, scale - 0.1);
+      const newScale = Math.max(0.1, scale - 0.1);
+      scale = newScale;
       updatePreview();
     }
   });
@@ -579,30 +432,5 @@ document.addEventListener("DOMContentLoaded", async () => {
   removeBackgroundButton.addEventListener("click", () => {
     removeBackground = !removeBackground;
     updatePreview();
-  });
-
-  colorPicker.addEventListener("change", () => {
-    selectedColor = colorPicker.value;
-    colorPickerPreview.style.backgroundColor = selectedColor;
-    updatePreview();
-  });
-
-  toleranceSlider.addEventListener("input", () => {
-    tolerance = toleranceSlider.value;
-    updatePreview();
-  });
-
-  stampSelect.addEventListener("change", async () => {
-    const selectedStamp = stampSelect.value;
-    if (selectedStamp) {
-      const stampImg = await loadImage(selectedStamp);
-      customImagePreview = stampImg;
-      customImagePosition = {
-        x: darkAreaBounds.x,
-        y: darkAreaBounds.y
-      };
-      scaleCustomImage();
-      updatePreview();
-    }
   });
 });
