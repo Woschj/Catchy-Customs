@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const REPO_NAME = "Catchy-Customs";
   const DESIGN_FOLDER = "design";
   const MATERIAL_FOLDER = "material";
+  const STAMP_FOLDER = "stamps"; // New folder for stamps
   const CANVAS_WIDTH = 544;
   const CANVAS_HEIGHT = 544;
 
@@ -10,6 +11,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   const modelSelect = document.getElementById("model-select");
   const designSelect = document.getElementById("design-select");
   const materialSelect = document.getElementById("material-select");
+  const stampSelect = document.getElementById("stamp-select"); // New stamp dropdown
   const customImageUpload = document.getElementById("custom-image-upload");
   const stampButton = document.getElementById("stamp-image");
   const zoomInButton = document.getElementById("zoomIn");
@@ -93,6 +95,19 @@ document.addEventListener("DOMContentLoaded", async () => {
       }));
   }
 
+  async function fetchStamps() {
+    const response = await fetch(
+      `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}/contents/${STAMP_FOLDER}`
+    );
+    const files = await response.json();
+    return files
+      .filter((file) => /\.(jpg|jpeg|png|gif)$/i.test(file.name))
+      .map((file) => ({
+        name: file.name,
+        url: `https://raw.githubusercontent.com/${REPO_OWNER}/${REPO_NAME}/main/${STAMP_FOLDER}/${file.name}`
+      }));
+  }
+
   function loadImage(src) {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -162,6 +177,9 @@ document.addEventListener("DOMContentLoaded", async () => {
   materialSelect.value = materials.find(
     (material) => material.name === "Nichts"
   ).url;
+
+  const stamps = await fetchStamps(); // Fetch stamps
+  populateDropdown(stampSelect, stamps); // Populate stamp dropdown
 
   designSelect.addEventListener("change", updatePreview);
   materialSelect.addEventListener("change", updatePreview);
@@ -572,5 +590,19 @@ document.addEventListener("DOMContentLoaded", async () => {
   toleranceSlider.addEventListener("input", () => {
     tolerance = toleranceSlider.value;
     updatePreview();
+  });
+
+  stampSelect.addEventListener("change", async () => {
+    const selectedStamp = stampSelect.value;
+    if (selectedStamp) {
+      const stampImg = await loadImage(selectedStamp);
+      customImagePreview = stampImg;
+      customImagePosition = {
+        x: darkAreaBounds.x,
+        y: darkAreaBounds.y
+      };
+      scaleCustomImage();
+      updatePreview();
+    }
   });
 });
