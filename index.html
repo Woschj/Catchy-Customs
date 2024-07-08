@@ -7,6 +7,7 @@
   <title>Catchy Cases</title>
   <link rel="stylesheet" href="styles.css">
   <style>
+    /* Existing styles */
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
       color: #e0e0e0;
@@ -171,6 +172,9 @@
 
       <label for="material-select">Material:</label>
       <select id="material-select"></select>
+
+      <label for="stamp-select">Stempel:</label> <!-- New dropdown for stamps -->
+      <select id="stamp-select"></select>
     </div>
     <div id="canvas-container">
       <canvas id="preview-canvas"></canvas>
@@ -179,11 +183,11 @@
       </div>
     </div>
     <div id="edit-controls">
-      <button id="stamp-image">Stempeln</button>
+      <button id="stamp-image">Bild Hinzufügen</button>
       <button id="zoomIn">+</button>
       <button id="zoomOut">-</button>
       <button id="export-image">Bild exportieren</button>
-      <button id="remove-background">Hintergrund entfernen</button>
+      <button id="remove-background">Hintergrund entfernen (experimental)</button>
     </div>
     <div id="custom-image-upload-container">
       <input type="file" id="custom-image-upload" accept="image/*">
